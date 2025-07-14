@@ -10,11 +10,7 @@
 - **Highlights:** 95 % accuracy; real‑time deployment
 - [GitHub Repo Link]
 
-## 📂 Folder Structure Overview
-- `/fraud_detection` – data ingestion & endpoint  
-- `/complaint_classifier` – training scripts + deployment
-
 ## 🛠️ Tools & Technologies
 - Python | scikit-learn | XGBoost | Transformers  
 - AWS: SageMaker, Lambda, Kinesis, SQS/SNS  
-- CI/CD | Docker | Git
+- CI/CD | Git
