@@ -9,7 +9,7 @@
 ### 2. Complaint Classifier (BERT + Logistic Regression)
 - **Stack:** HuggingFace Transformers, scikit‑learn, SageMaker
 - **Highlights:** 95 % accuracy; real‑time deployment
-- [Neural Network Fundamentals](https://github.com/jayshree-pillai/neural-network-fundamentals)
+- [Real-Time NLP Complaint Classifier](https://github.com/jayshree-pillai/real-time-nlp-complaint-classifier)
 
 
 ## 🛠️ Tools & Technologies
