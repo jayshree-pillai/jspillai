@@ -1,18 +1,35 @@
-## Featured Projects
+# Hi There! Welcome to my github repo - 
 
-### 1. Real‑Time Fraud Detection (AWS + XGBoost)
-- **Stack:** Python, Kinesis, Lambda, SageMaker, SNS/SQS
-- **Highlights:** Sub‑100 ms latency; ROC AUC = 0.94
-- [Real-Time XGBoost Fraud Detection](https://github.com/jayshree-pillai/real-time-xgb-fraud-detection)
+I am Jayshree Pillai,a Machine Learning Engineer with a strong foundation in production systems and a deep focus on real-time ML pipelines, MLOps, and applied modeling. I bring over a decade of software engineering experience and have recently built and deployed full-stack ML solutions using AWS SageMaker, Lambda, Kinesis, and Feature Store.
 
+This repo serves as a landing page to showcase my key projects and ML portfolio. All work here reflects hands-on, end-to-end implementation.
 
-### 2. Complaint Classifier (BERT + Logistic Regression)
-- **Stack:** HuggingFace Transformers, scikit‑learn, SageMaker
-- **Highlights:** 95 % accuracy; real‑time deployment
-- [Real-Time NLP Complaint Classifier](https://github.com/jayshree-pillai/real-time-nlp-complaint-classifier)
+---
 
+## 🔧 Featured Projects
 
-## 🛠️ Tools & Technologies
-- Python | scikit-learn | XGBoost | Transformers  
-- AWS: SageMaker, Lambda, Kinesis, SQS/SNS  
-- CI/CD | Git
+- **[Real-Time XGBoost Fraud Detection](https://github.com/jayshree-pillai/real-time-xgb-fraud-detection)**  
+  End-to-end fraud detection pipeline using AWS SageMaker, Kinesis, Lambda, and Feature Store with real-time prediction, alerting, and monitoring.
+
+- **[Real-Time NLP Complaint Classifier](https://github.com/jayshree-pillai/real-time-nlp-complaint-classifier)**  
+Classifies consumer complaints in real-time using a BERT-based NLP pipeline deployed on AWS.
+
+- **[Neural Network Fundamentals](https://github.com/jayshree-pillai/neural-network-fundamentals)**  
+  Manual implementation of forward pass, backpropagation, and gradient descent in NumPy to internalize neural network mechanics.
+
+- **[Loan Default Classifier](https://github.com/jayshree-pillai/cart-classification-loan-defaults)**  
+  CART model for loan default prediction with SMOTE, profit-driven metrics, and class balancing.
+
+- **[Bike Rentals Demand Forecast](https://github.com/jayshree-pillai/cart-regression-bike-rentals)**  
+  Regression model using XGBoost to predict hourly bike rental demand with feature engineering and tuning.
+
+---
+
+## 📫 Let’s Connect
+
+- **LinkedIn:** [linkedin.com/in/jspillai](https://linkedin.com/in/jspillai)
+- **GitHub:** [github.com/jayshree-pillai](https://github.com/jayshree-pillai)
+
+---
+
+Thanks for visiting — always open to collaboration and meaningful ML work!
