@@ -9,7 +9,8 @@
 ### 2. Complaint Classifier (BERT + Logistic Regression)
 - **Stack:** HuggingFace Transformers, scikit‑learn, SageMaker
 - **Highlights:** 95 % accuracy; real‑time deployment
-- [GitHub Repo Link]
+- [Neural Network Fundamentals](https://github.com/jayshree-pillai/neural-network-fundamentals)
+
 
 ## 🛠️ Tools & Technologies
 - Python | scikit-learn | XGBoost | Transformers  
