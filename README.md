@@ -25,6 +25,14 @@ Classifies consumer complaints in real-time using a BERT-based NLP pipeline depl
 
 ---
 
+## 🛠️ In Progress
+
+- Currently building out a **proprietary trading signal engine** from scratch — focused on backtesting, alpha generation, and real-time strategy execution.  
+- Code and detailed repo to be shared soon as I complete validation of core logic and risk filters.
+
+---
+
+
 ## 📫 Let’s Connect
 
 - **LinkedIn:** [linkedin.com/in/jspillai](https://linkedin.com/in/jspillai)
