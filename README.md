@@ -3,7 +3,7 @@
 ### 1. Real‑Time Fraud Detection (AWS + XGBoost)
 - **Stack:** Python, Kinesis, Lambda, SageMaker, SNS/SQS
 - **Highlights:** Sub‑100 ms latency; ROC AUC = 0.94
-- - [Real-Time XGBoost Fraud Detection](https://github.com/jayshree-pillai/real-time-xgb-fraud-detection)
+- [Real-Time XGBoost Fraud Detection](https://github.com/jayshree-pillai/real-time-xgb-fraud-detection)
 
 
 ### 2. Complaint Classifier (BERT + Logistic Regression)
