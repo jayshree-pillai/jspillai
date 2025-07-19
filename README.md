@@ -8,7 +8,7 @@ My focus: end-to-end ML systems — from modeling and evaluation to infrastructu
 
 Every project here reflects hands-on implementation across classification, regression, and NLP using tools like AWS SageMaker, Lambda, Kinesis, and Feature Store.
 
-This GitHub isn’t for experiments. It’s a track record of deployed systems.
+This GitHub isn’t for experiments. It’s a track record of deployed systems.Want to see this in action? [watch the live demo](#-live-demo)
 
 ---
 
