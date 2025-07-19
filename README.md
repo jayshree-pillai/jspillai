@@ -28,6 +28,16 @@ Hourly demand prediction using XGBoost and feature-engineered weather + time var
 
 ---
 
+## 🎬 Live Demo
+
+▶️ [Watch the Real-Time Fraud Detection Pipeline in Action](https://your-demo-link.com)  
+End-to-end walkthrough: ingestion → feature logging → SageMaker inference → SNS alert.
+
+▶️ [See the NLP Complaint Classifier Live](https://your-nlp-demo-link.com)  
+Full flow: text input → tokenization → fine-tuned BERT → category prediction → logs to S3.
+
+---
+
 ## 🧪 Currently Building
 
 🎯 **Proprietary Trading Signal Engine**  
