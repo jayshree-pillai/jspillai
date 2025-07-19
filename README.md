@@ -3,9 +3,12 @@
 
 Welcome to my portfolio.
 
-I design and deploy **real-time ML systems** using the full AWS MLOps stack — SageMaker, Lambda, Kinesis, and Feature Store. With over a decade of engineering experience, I’ve transitioned from building trading infrastructure and risk pipelines to owning **end-to-end ML deployments** for high-stakes classification and regression systems.
+I specialize in designing real-time machine learning pipelines with low-latency inference, robust retraining loops, and production-grade deployment on AWS.
+My focus: end-to-end ML systems — from modeling and evaluation to infrastructure and observability.
 
-This GitHub is not a playground. It’s a proof-of-execution.
+Every project here reflects hands-on implementation across classification, regression, and NLP using tools like AWS SageMaker, Lambda, Kinesis, and Feature Store.
+
+This GitHub isn’t for experiments. It’s a track record of deployed systems.
 
 ---
 
