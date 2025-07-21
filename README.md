@@ -18,7 +18,7 @@ This GitHub isn’t for experiments. It’s a track record of deployed systems.W
 Full-stack fraud detection pipeline with streaming ingestion, low-latency inference (<300ms), and real-time alerting. Deployed via SageMaker, Kinesis, Lambda, and SQS/SNS.
 
 ### 🔹 [Real-Time NLP Complaint Classifier](https://github.com/jayshree-pillai/real-time-nlp-complaint-classifier)  
-DistilBERT fine-tuned on 129K+ financial complaints. End-to-end pipeline includes feature extraction, custom classifier head, SageMaker deployment, and Agentify-ready retraining hooks.
+End-to-end real-time NLP pipeline using fine-tuned DistilBERT on 129K+ financial complaints — containerized, deployed to SageMaker, and built with Agentify-ready retraining hooks.
 
 ### 🔹 [Neural Network Fundamentals](https://github.com/jayshree-pillai/neural-network-fundamentals)  
 Forward pass, backprop, and gradient descent built from scratch in NumPy to validate internal mechanics — no frameworks, just math and control.
