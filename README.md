@@ -33,11 +33,11 @@ Hourly demand prediction using XGBoost and feature-engineered weather + time var
 
 ## 🎬 Live Demo
 
-▶️ [Watch the Real-Time Fraud Detection Pipeline in Action](https://your-demo-link.com)  
-End-to-end walkthrough: ingestion → feature logging → SageMaker inference → SNS alert.
+▶️ [Watch the Real-Time Fraud Detection Pipeline in Action](https://hatketech-demos.s3.amazonaws.com/fraud-demo.mp4)  
+*Full pipeline walkthrough with XGBoost model, Kinesis streaming, SageMaker inference, and SNS alerting.*
 
-▶️ [See the NLP Complaint Classifier Live](https://your-nlp-demo-link.com)  
-Full flow: text input → tokenization → fine-tuned BERT → category prediction → logs to S3.
+▶️ [See the NLP Complaint Classifier Live](https://hatketech-demos.s3.amazonaws.com/distilbert-demo.mp4)  
+*End-to-end pipeline with DistilBERT fine-tuning, Dockerized Flask API, and SageMaker deployment.*
 
 ---
 
