@@ -39,14 +39,6 @@ Hourly demand prediction using XGBoost and feature-engineered weather + time var
 ▶️ [See the NLP Complaint Classifier Live](https://hatketech-demos.s3.amazonaws.com/distilbert-demo.mp4)  
 *End-to-end pipeline with DistilBERT fine-tuning, Dockerized Flask API, and SageMaker deployment.*
 
----
-
-## 🧪 Currently Building
-
-🎯 **Proprietary Trading Signal Engine**  
-From-scratch alpha generation and strategy backtesting framework  
-Focused on conditional filters, regime classification, and live execution logic  
-Repo will be public once signal logic and guardrails are fully validated
 
 ---
 
