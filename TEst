@@ -1,3 +1,4 @@
+Cost to store get info from LLM
 | LLM     | Embedding model | Dims | Embed cost | CAR LLM cost | **Total (first run)**                 |
 | ------- | --------------- | ---- | ---------- | ------------ | ------------------------------------- |
 | GPT-4.1 | 3-small         | 1024 | $0.009     | $0.56        | **$0.569**                            |
@@ -6,3 +7,237 @@
 | GPT-5   | 3-small         | 1024 | $0.009     | $0.45        | **$0.459**                            |
 | GPT-5   | 3-large         | 1024 | $0.058     | $0.45        | **$0.508**                            |
 | GPT-5   | 3-large         | 3072 | $0.058     | $0.45        | **$0.508** (+ extra RAM / index size) |
+
+Cost to convert 10k into embeddings
+| Embedding model | Vector dims | #vectors | Vector size  | One-time embed cost | Monthly storage (≈$0.25/GB) |
+| --------------- | ----------- | -------- | ------------ | ------------------- | --------------------------- |
+| 3-small         | **1024**    | 556      | **2.17 MiB** | **$0.009**          | **$0.0005**                 |
+| 3-small         | **1536**    | 556      | **3.26 MiB** | **$0.009**          | **$0.0008**                 |
+| 3-small         | **3072**    | –        | –            | **N/A (max 1536)**  | –                           |
+| 3-large         | **1024**    | 556      | **2.17 MiB** | **$0.058**          | **$0.0005**                 |
+| 3-large         | **3072**    | 556      | **6.52 MiB** | **$0.058**          | **$0.0016**                 |
+
+
+| Metric                    | **GPT-4.1**                                   | **GPT-5.1**                                                                                                    |
+| ------------------------- | --------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| **Role in pipeline**      | Fast RAG Q&A & summaries                      | Deep CAR generation & multi-section analysis                                                                    |
+| **Context window**        | **~1,047,576 tokens** ([OpenAI Platform][1])  | **400,000 tokens** ([OpenAI Platform][2])                                                                      |
+| **Quality / reasoning**   | Strong summarizer; good single-step reasoning | Higher-end reasoning; better on complex, multi-hop tasks (beats 4.1 on AIME, GPQA, MMMU etc.) ([LLM Stats][3]) |
+| **Input price (per 1M)**  | **$2.00**                                     | **$1.25** ([OpenAI Platform][1])                                                                               |
+| **Cached input (per 1M)** | **$0.50**                                     | **$0.13** ([OpenAI Platform][1])                                                                               |
+| **Output price (per 1M)** | **$8.00**                                     | **$10.00** ([OpenAI Platform][1])                                                                              |
+| **Latency profile**       | Lower TTFT; better for high-QPS chat          | Higher TTFT (adaptive reasoning) but fewer reruns for complex asks                                             |
+
+[1]: https://platform.openai.com/docs/models/compare?model=gpt-4.1&utm_source=chatgpt.com "Compare models - OpenAI API"
+[2]: https://platform.openai.com/docs/models/compare?model=gpt-5.1&utm_source=chatgpt.com "Compare models - OpenAI API"
+[3]: https://llm-stats.com/models/compare/gpt-4.1-2025-04-14-vs-gpt-5.1-thinking-2025-11-12?utm_source=chatgpt.com "GPT-4.1 vs GPT-5.1 Thinking"
+
+4.1 = bigger desk, average analyst
+5.1 = slightly smaller desk, much smarter analyst, cheaper hourly rate
+5.1 is trained as a reasoning model: better at
+multi-step logic,reconciling conflicting numbers,tracing dependencies across different sections (e.g., footnotes ↔ MD&A ↔ cash flow).
+“Tell me how liquidity, capital ratios, and segment revenue tie together, and point to the evidence.” We rarely hit the context limit in CAR RAG, but you constantly hit reasoning complexity.
+
+0. Assumptions (so you can sanity-check)
+
+250,000 words × 1.33 tokens/word ≈ 332,500 tokens
+-----------------------
+What does “556 vectors” actually mean?
+
+In the example we were using:
+Chunk size: 800 tokens
+Overlap: 200 tokens (stride = 600)
+#chunks (≈ #vectors): 556
+So:
+556 vectors × 800 tokens/vector = 444,800 tokens
+Now convert tokens → words using our rule of thumb:
+
+1 token ≈ 0.75 words
+⇒ words ≈ tokens × 0.75
+
+So:
+
+444,800 tokens × 0.75 ≈ 333,600 words
+Answer:
+👉 556 vectors ≈ 444,800 tokens ≈ ~334k words of text as seen by the embedding API.
+
+Why is that more than the 250k words we estimated for the 10-K?
+
+Because with overlap:
+
+Each chunk repeats some text (the 200-token overlap with the previous chunk),
+
+So the embeddings API “sees” more tokens than the number of unique tokens/words in the document.
+
+Roughly:
+
+Unique doc content: ~250k words (~333k tokens)
+
+Embedding workload (with overlap): ~334k words’ worth of tokens (444.8k tokens)
+
+So 556 vectors is not “556 separate pages”; it’s 556 overlapping slices of the same 10-K.
+--------------------------------------------------------------------------------------------
+Document size
+
+500 pages × 500 words/page ≈ 250,000 words.
+
+Rule of thumb: 0.75 words/token → tokens ≈ 250,000 / 0.75 ≈ 333,000 tokens.
+
+Chunking for RAG
+
+Chunk size = 800 tokens, overlap = 200 → stride = 600.
+
+#chunks ≈ 556
+
+Total tokens fed to embeddings = 556 × 800 = 444,800 tokens (≈0.445M).
+
+Embedding prices (OpenAI list)
+
+text-embedding-3-small: $0.02 / 1M tokens
+
+text-embedding-3-large: $0.13 / 1M tokens
+
+Default dims: 3-small = 1536; 3-large = 3072. Both can be shortened using dimensions (e.g. 1024).
+
+Important: 3-small cannot go to 3072 dims; max is 1536. 3072 only applies to 3-large.
+
+Vector storage math
+
+Assume float32: 4 bytes / dim.
+
+Size = #chunks × dims × 4 bytes.
+
+LLM usage for CAR generation
+
+To keep this simple and defensible, assume your full CAR run over that 10-K uses in total:
+
+200k input tokens (sum of all prompts across sections)
+
+20k output tokens (all final CAR text)
+
+You can scale the numbers linearly if you end up with 100k / 10k or 400k / 40k instead.
+
+LLM prices (OpenAI list)
+
+GPT-4.1:
+
+Input: $2.00 / 1M tokens, Output: $8.00 / 1M tokens
+
+GPT-5 (what you called 5.0):
+
+Input: $1.25 / 1M tokens, Output: $10.00 / 1M tokens
+
+1. Embedding + Vector Storage per JPM 10-K
+1A. One-time embedding cost (per 10-K)
+
+Using 444,800 embedding tokens (~0.445M):
+
+3-small: 0.445M × $0.02 ≈ $0.0089
+
+3-large: 0.445M × $0.13 ≈ $0.0578
+
+So:
+
+3-small: ≈ $0.009 to index one JPM 10-K
+
+3-large: ≈ $0.058 to index one JPM 10-K
+
+This does not depend on 1024 vs 3072 dims – only on tokens.
+
+1B. Vector size & storage – 1024 vs 3072 dims
+
+For 556 vectors:
+
+1024 dims:
+
+Size = 556 × 1024 × 4 bytes ≈ 2.17 MiB
+
+1536 dims (default 3-small):
+
+Size ≈ 3.26 MiB
+
+3072 dims (default 3-large):
+
+Size ≈ 6.52 MiB
+
+If you price storage purely as $0.25 / GB-month (rough Azure storage ballpark):
+
+2.17 MiB ≈ 0.0021 GB → ~$0.0005 / month
+
+3.26 MiB ≈ 0.0032 GB → ~$0.0008 / month
+
+6.52 MiB ≈ 0.0064 GB → ~$0.0016 / month
+
+So per 10-K, vector storage is fractions of a cent per month – the real cost is the search unit (Basic/S1), not the incremental file.
+
+1C. Summary table: embedding + storage (per 10-K)
+Embedding model	Vector dims	#vectors	Vector size	One-time embed cost	Monthly storage (≈$0.25/GB)
+3-small	1024	556	2.17 MiB	$0.009	$0.0005
+3-small	1536	556	3.26 MiB	$0.009	$0.0008
+3-small	3072	–	–	N/A (max 1536)	–
+3-large	1024	556	2.17 MiB	$0.058	$0.0005
+3-large	3072	556	6.52 MiB	$0.058	$0.0016
+
+Big picture: going from 1024 → 3072 dims on 3-large triples vector storage per 10-K, but your per-document $ impact is still tiny. The real trade-off is index capacity & RAM at scale (thousands of filings).
+
+2. LLM Cost to Generate CAR per JPM 10-K
+
+Using the earlier assumption:
+
+200,000 input tokens total
+
+20,000 output tokens total
+
+2A. GPT-4.1
+
+Input: 0.2M × $2.00 = $0.40
+
+Output: 0.02M × $8.00 = $0.16
+
+Total per CAR (4.1): ≈ $0.56
+
+2B. GPT-5
+
+Input: 0.2M × $1.25 = $0.25
+
+Output: 0.02M × $10.00 = $0.20
+
+Total per CAR (5): ≈ $0.45
+
+So for one 500-page JPM 10-K, at this usage level:
+
+GPT-4.1 CAR run: ~$0.56
+
+GPT-5 CAR run: ~$0.45
+
+And you can scale linearly:
+
+If you only use 100k / 10k tokens → divide by 2
+
+If you use 400k / 40k tokens → multiply by 2
+
+3. Combined per-filing view (embed + CAR generation)
+
+Per JPM 10-K, one-time embedding + one full CAR generation:
+
+LLM	Embedding model	Dims	Embed cost	CAR LLM cost	Total (first run)
+GPT-4.1	3-small	1024	$0.009	$0.56	$0.569
+GPT-4.1	3-large	1024	$0.058	$0.56	$0.618
+GPT-4.1	3-large	3072	$0.058	$0.56	$0.618 (+ extra RAM / index size)
+GPT-5	3-small	1024	$0.009	$0.45	$0.459
+GPT-5	3-large	1024	$0.058	$0.45	$0.508
+GPT-5	3-large	3072	$0.058	$0.45	$0.508 (+ extra RAM / index size)
+
+Key takeaways you can say out loud to a tech-heavy business:
+
+Indexing cost per 10-K is pennies (1¢ with 3-small, 6¢ with 3-large).
+
+Vector storage per 10-K is a few MB → << 1 cent/month, even at 3072 dims.
+
+The real money is the LLM:
+
+Around $0.45–0.60 per full CAR at 200k/20k tokens.
+
+GPT-5 is ~20% cheaper than GPT-4.1 at that usage level and gives you better reasoning.
+
+If you want, next step I can redo this with your actual CAR token counts (once you have logs) so you can show a “this is what we’re really paying per filing” slide to UPH.
