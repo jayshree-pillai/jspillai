@@ -1,3 +1,197 @@
+company-overview-engine/
+├─ README.md
+├─ pyproject.toml                    # deps: pydantic, openai/azure, click, pyyaml, etc.
+├─ docs/
+│  ├─ architecture.md                # high-level design for company_overview engine
+│  ├─ prompt_lifecycle.md            # how prompts are versioned, tested, promoted
+│  └─ eval_methodology.md            # how you evaluate company_overview quality
+├─ examples/
+│  ├─ sample_company_input.json      # mocked company data (bank / SaaS, etc.)
+│  └─ sample_company_overview.json   # sample parsed output
+├─ src/
+│  └─ company_overview_engine/
+│     ├─ __init__.py
+│     │
+│     ├─ config/
+│     │  ├─ company_overview.yaml    # core config for this section:
+│     │  │                          #   - prompt_name: company_overview
+│     │  │                          #   - active_version: v2025_02_15
+│     │  │                          #   - schema: company_overview_engine.schemas.company_overview.CompanyOverviewOutput
+│     │  │                          #   - use_case: company_overview
+│     │  ├─ models.yaml             # model routing (which LLM to use when)
+│     │  │                          # e.g.:
+│     │  │                          # company_overview:
+│     │  │                          #   default_model: gpt-4.1-mini
+│     │  │                          #   long_doc_model: gpt-4.1
+│     │  ├─ kpi_registry.py         # KPI dictionary (id, label, domain, tags, unit)
+│     │  ├─ kpi_packs.yaml          # how to pick KPIs per industry/use_case
+│     │  ├─ prompt_policies.yaml    # temp, max_tokens, retries, safety flags
+│     │  └─ logging.yaml            # logging/telmetry config
+│     │
+│     ├─ prompts/
+│     │  └─ company_overview/
+│     │     ├─ prompt_v2025_01_10.md    # initial prod prompt
+│     │     ├─ prompt_v2025_02_15.md    # improved / few-shot tuned prompt
+│     │     └─ meta.yaml                # owner, notes, change log, default version
+│     │
+│     ├─ schemas/
+│     │  ├─ __init__.py
+│     │  ├─ base.py                     # BaseModel config: forbid_extra, etc.
+│     │  └─ company_overview.py         # CompanyOverviewOutput Pydantic model:
+│     │                                #   profile, strategic_position,
+│     │                                #   financial_health, risks[], kpis[]
+│     │
+│     ├─ engine/                        # runtime for company_overview only
+│     │  ├─ llm_client.py               # OpenAI/Azure wrapper (keys, retries at HTTP level)
+│     │  ├─ routing.py                  # chooses model from config/models.yaml
+│     │  ├─ prompt_loader.py            # load & render company_overview prompt by version
+│     │  ├─ guardrails.py               # JSON schema enforcement, safety / sanity checks
+│     │  ├─ retry_policies.py           # retry on invalid JSON / truncation using guardrails
+│     │  └─ runtime.py                  # company_overview() entry:
+│     │                                #   - load config
+│     │                                #   - select KPIs
+│     │                                #   - render prompt
+│     │                                #   - call LLM via routing + llm_client
+│     │                                #   - validate + return parsed + metadata
+│     │
+│     ├─ eval/                          # offline evaluation for company_overview
+│     │  ├─ __init__.py
+│     │  ├─ datasets/
+│     │  │  └─ company_overview.jsonl   # test cases: input + expectations
+│     │  ├─ metrics.py                  # schema_ok, KPI accuracy, coverage, text checks
+│     │  ├─ kpi_eval.py                 # numeric consistency vs ground truth (CET1, NIM, ARR, etc.)
+│     │  ├─ text_eval.py                # simple expectations: key terms, risk coverage
+│     │  ├─ llm_judge.py                # optional LLM-as-judge scoring (faithfulness, clarity)
+│     │  └─ run_tests.py                # CLI / VS startup:
+│     │                                #   - iterate test dataset
+│     │                                #   - call engine.runtime.company_overview()
+│     │                                #   - compute metrics, write CSV (eval_results.csv)
+│     │
+│     ├─ telemetry/
+│     │  ├─ logging_config.py           # sets up structured logging (JSON logs if desired)
+│     │  ├─ event_logger.py             # log per-call: version, model, latency, tokens, cost
+│     │  ├─ cost_estimator.py           # estimate $ cost from token counts & model pricing
+│     │  └─ exporters/
+│     │     ├─ console_exporter.py      # dev-mode printing
+│     │     ├─ csv_exporter.py          # append prod/eval runs to CSV
+│     │     └─ prometheus_exporter.py   # optional metrics endpoint
+│     │
+│     ├─ cli/
+│     │  ├─ __init__.py
+│     │  └─ main.py                     # click/argparse:
+│     │                                #   - `co-engine generate --industry banking --input examples/sample_company_input.json`
+│     │                                #   - `co-engine eval` (wraps eval/run_tests.py)
+│     │
+│     └─ utils/
+│        ├─ json_utils.py               # safe JSON parsing / repair / minify
+│        ├─ time_utils.py               # latency measuring helpers
+│        └─ typing_helpers.py           # shared type aliases / Result types
+│
+└─ tests/                               # pytest unit tests for this single section
+   ├─ test_schema_company_overview.py   # Pydantic model behavior, required fields
+   ├─ test_engine_prompt_loader.py      # correct version/file loaded, vars rendered
+   ├─ test_engine_guardrails.py         # invalid JSON triggers retry / error
+   ├─ test_eval_kpi_eval.py             # KPI numeric checks work
+   └─ test_cli_generate.py              # CLI generate command works end-to-end on mock
+
+-----
+You can now implement just the core path:
+	1.	schemas/company_overview.py
+	2.	config/company_overview.yaml
+	3.	prompts/company_overview/prompt_v2025_02_15.md
+	4.	engine/runtime.py
+	5.	eval/run_tests.py
+------
+co-engine generate --industry banking --input examples/sample_company_input.json
+
+-------
+0. Entry point
+
+File: src/company_overview_engine/cli/main.py
+What it does:
+	1.	Parses CLI args:
+	•	industry = "banking"
+	•	company_data = load JSON from examples/sample_company_input.json
+	2.	Calls the core runtime:
+from company_overview_engine.engine.runtime import company_overview
+
+result = company_overview(industry=industry, company_data=company_data)
+
+1. Runtime bootstraps config
+
+File: src/company_overview_engine/engine/runtime.py
+
+When company_overview() starts, it:
+	1.	Loads section config:
+	•	File read: config/company_overview.yaml
+	•	From here it gets:
+	•	prompt_name: "company_overview"
+	•	active_version: "v2025_02_15"
+	•	schema: "company_overview_engine.schemas.company_overview.CompanyOverviewOutput"
+	•	use_case: "company_overview"
+	2.	Loads model routing config:
+	•	File read: config/models.yaml
+	•	To decide which Azure model/deployment to hit for this request.
+
+So at this point, runtime knows:
+	•	which prompt version to use,
+	•	which schema to validate against,
+	•	which Azure model/deployment to call.
+
+⸻
+
+2. Select KPIs for the given industry
+
+Still in:
+
+File: engine/runtime.py
+	1.	It imports KPI selection logic and configs:
+	•	Python module used: config/kpi_registry.py
+	•	File read: config/kpi_packs.yaml
+	2.	It calls something like select_kpis_for_industry(use_case="company_overview", industry="banking") which:
+	•	filters KPIs from KPI_REGISTRY (e.g., banking.CET1, banking.NIM, etc.),
+	•	uses kpi_packs.yaml to cap/choose which ones to show in the overview.
+
+kpis = [
+  {"id": "banking.CET1", "name": "CET1 capital ratio", "unit": "%"},
+  {"id": "banking.NIM", "name": "Net interest margin", "unit": "%"},
+  ...
+]
+These are exactly the KPI parameters that will be injected into the prompt for that industry.
+
+⸻
+
+3. Load and render the prompt
+
+Files:
+	•	engine/prompt_loader.py
+	•	prompts/company_overview/prompt_v2025_02_15.md
+
+Inside runtime.company_overview():
+	1.	Call load_prompt(prompt_name="company_overview", version="v2025_02_15")
+	•	File read:
+src/company_overview_engine/prompts/company_overview/prompt_v2025_02_15.md
+This file contains your full template, including sections like:
+
+# System
+You are a senior financial analyst...
+
+# Task
+...
+
+Industry: {{industry}}
+
+Relevant KPIs:
+{{kpi_descriptions}}
+
+Company data:
+{{company_data}}
+
+Output format (MANDATORY)...
+
+
+
+----------------
 Cost to store get info from LLM
 | LLM     | Embedding model | Dims | Embed cost | CAR LLM cost | **Total (first run)**                 |
 | ------- | --------------- | ---- | ---------- | ------------ | ------------------------------------- |
