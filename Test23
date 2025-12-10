@@ -15,39 +15,30 @@ src/prompt_lifecycle/engine/runtime.py
 
 Inside here you:
 
-load config:
-
-config/company_overview.yaml
-
-config/models.yaml
-
-config/kpi_registry.py
-
-config/kpi_packs.yaml
+load config:  
+       config/company_overview.yaml
+       config/models.yaml
+      config/kpi_registry.py
+      config/kpi_packs.yaml
 
 select KPIs
+    load prompt & render:
+    engine/prompt_loader.py
+          prompts/company_overview/prompt_v2025_02_15.md
 
-load prompt & render:
-
-engine/prompt_loader.py
-
-prompts/company_overview/prompt_v2025_02_15.md
-
-Model routing + LLM call
+3:Model routing + LLM call
 
 pick model: engine/routing.py (reads config/models.yaml)
 
 call Azure/OpenAI: engine/llm_client.py
 
-Guardrails & schema validation
+4:Guardrails & schema validation
 
-JSON repair/validation: engine/guardrails.py
+    JSON repair/validation: engine/guardrails.py
+    retry policies (if you add them): engine/retry_policies.py
+    schema: schemas/company_overview.py
 
-retry policies (if you add them): engine/retry_policies.py
-
-schema: schemas/company_overview.py
-
-Telemetry
+5:Telemetry
 
 telemetry/event_logger.py
 
@@ -55,7 +46,7 @@ telemetry/cost_estimator.py
 
 (plus telemetry/logging_config.py to set up logging)
 
-Return to CLI
+6: Return to CLI
 
 company_overview() returns {parsed, raw, metadata}
 
