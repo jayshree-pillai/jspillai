@@ -1,0 +1,145 @@
+End-to-end flow: UBER → generate “Company Overview” section
+
+0) Trigger + bootstrapping
+	1.	car_generation/app/functions/report_function.py
+	•	Azure Cosmos trigger (or HTTP trigger) fires with a document that includes ccif_id (UBER’s CCIF) and/or blob path(s).
+	•	Calls into ReportService.
+	2.	car_generation/core/config.py
+	•	Loads env/ini config used by the run (containers, search index names, model deployment names, etc.).
+	3.	car_generation/core/clients.py
+	•	init_clients() creates clients used downstream:
+	•	Cosmos client/containers
+	•	Azure Search client / vector store
+	•	Azure OpenAI client (or whatever the PromptLC engine uses)
+	•	Blob client (if needed)
+	4.	car_generation/adapters/persistence/pipeline_run_repo.py
+	•	check_in_progress(ccif_id=UBER) to avoid duplicate runs.
+	•	update_run_status(... IN_PROGRESS ...)
+
+⸻
+
+1) Resolve UBER metadata (industry/subindustry routing inputs)
+	5.	car_generation/services/metadata_service.py
+	•	load_counterparty_df(...) (only if you use the blob-hosted DF cache)
+	•	lookup_metadata(ccif_id=UBER) → returns Counterparty with:
+	•	company_name
+	•	l1_industry, l2_industry, l3_industry (or however your taxonomy is stored)
+	6.	car_generation/domain/models/counterparty.py
+	•	Counterparty model is instantiated/validated here.
+
+⸻
+
+2) Select the right document set (what to summarize)
+	7.	car_generation/services/document_validation.py
+	•	get_latest_docdate_combination(...) picks the “best” doc combo for UBER:
+	•	latest 10-K
+	•	a valid 10-Q (if required)
+	•	latest ratings (if required)
+	•	Returns the chosen dates and missing doc list (if any).
+	8.	car_generation/adapters/persistence/cosmos_reports_repo.py
+	•	Fetches the selected docs (10-K/10-Q/ratings/JSON) from Cosmos.
+	9.	car_generation/adapters/search/azure_search_repo.py
+	•	Builds filters (e.g., by ccif_id, doc_type, publish_date)
+	•	Retrieves chunks/snippets for the section context (vector or keyword search).
+	10.	car_generation/services/embedding_service.py (if you gate retrieval on embedding existence)
+
+	•	check_embeddings(...) / should_embed(...) to decide whether embeddings exist / need generation.
+
+
+
+
+---------
+
+0) Trigger + bootstrapping
+	1.	car_generation/app/functions/report_function.py
+	•	Azure Cosmos trigger (or HTTP trigger) fires with a document that includes ccif_id (UBER’s CCIF) and/or blob path(s).
+	•	Calls into ReportService.
+	2.	car_generation/core/config.py
+	•	Loads env/ini config used by the run (containers, search index names, model deployment names, etc.).
+	3.	car_generation/core/clients.py
+	•	init_clients() creates clients used downstream:
+	•	Cosmos client/containers
+	•	Azure Search client / vector store
+	•	Azure OpenAI client (or whatever the PromptLC engine uses)
+	•	Blob client (if needed)
+	4.	car_generation/adapters/persistence/pipeline_run_repo.py
+	•	check_in_progress(ccif_id=UBER) to avoid duplicate runs.
+	•	update_run_status(... IN_PROGRESS ...)
+
+⸻
+
+1) Resolve UBER metadata (industry/subindustry routing inputs)
+	5.	car_generation/services/metadata_service.py
+	•	load_counterparty_df(...) (only if you use the blob-hosted DF cache)
+	•	lookup_metadata(ccif_id=UBER) → returns Counterparty with:
+	•	company_name
+	•	l1_industry, l2_industry, l3_industry (or however your taxonomy is stored)
+	6.	car_generation/domain/models/counterparty.py
+	•	Counterparty model is instantiated/validated here.
+
+⸻
+
+2) Select the right document set (what to summarize)
+	7.	car_generation/services/document_validation.py
+	•	get_latest_docdate_combination(...) picks the “best” doc combo for UBER:
+	•	latest 10-K
+	•	a valid 10-Q (if required)
+	•	latest ratings (if required)
+	•	Returns the chosen dates and missing doc list (if any).
+	8.	car_generation/adapters/persistence/cosmos_reports_repo.py
+	•	Fetches the selected docs (10-K/10-Q/ratings/JSON) from Cosmos.
+	9.	car_generation/adapters/search/azure_search_repo.py
+	•	Builds filters (e.g., by ccif_id, doc_type, publish_date)
+	•	Retrieves chunks/snippets for the section context (vector or keyword search).
+	10.	car_generation/services/embedding_service.py (if you gate retrieval on embedding existence)
+
+	•	check_embeddings(...) / should_embed(...) to decide whether embeddings exist / need generation.
+
+⸻
+
+3) “Company Overview” section generation (section framework)
+	11.	car_generation/services/report_service.py
+
+	•	Drives section generation loop.
+	•	For now it asks for only one section: COMPANY_OVERVIEW.
+
+	12.	car_generation/services/sections/registry.py
+
+	•	Resolves SectionId.COMPANY_OVERVIEW → CompanyOverviewGenerator.
+
+	13.	car_generation/services/sections/company_overview.py
+
+	•	CompanyOverviewGenerator.generate(...):
+	•	receives ccif_id, Counterparty metadata (industry/subindustry), and retrieved context docs/chunks
+	•	calls PromptLC to get the correct prompt for this section + industry/subindustry
+	•	calls LLM and produces SectionResult (text + citations + prompt version used)
+
+	14.	Prompt Lifecycle project (prompt resolution + LLM call)
+
+	•	prompt_lifecycle/config/industry_map.yaml (maps UBER’s raw industry label → canonical key)
+	•	prompt_lifecycle/config/kpi_registry.yaml / kpi_packs.yaml (which KPIs apply)
+	•	prompt_lifecycle/prompts/company_overview/prompt_v*.md (the actual prompt template/version)
+	•	prompt_lifecycle/engine/routing.py (chooses the correct prompt set)
+	•	prompt_lifecycle/engine/prompt_loader.py (loads the prompt)
+	•	prompt_lifecycle/engine/runtime.py (builds final prompt with variables/context)
+	•	prompt_lifecycle/engine/llm_client.py (executes the model call)
+	•	(optional) prompt_lifecycle/engine/guardrails.py / retry policies
+
+	15.	car_generation/domain/models/report_models.py
+
+	•	Citation, SectionSummary (if you use), and/or section output models are validated here.
+
+⸻
+
+4) Assemble final report + persist
+	16.	car_generation/services/report_service.py
+
+	•	Wraps the returned section into the full Report / CreditAnalysisReport structure.
+
+	17.	car_generation/adapters/persistence/cosmos_reports_repo.py
+
+	•	upload_car_report(...) persists the report document for UBER into Cosmos.
+
+	18.	car_generation/adapters/persistence/pipeline_run_repo.py
+
+	•	update_run_status(... COMPLETED ...) (or FAILED if anything throws)
