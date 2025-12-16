@@ -1,0 +1,58 @@
+car_generation/
+  app/
+    functions/
+      ingest_function.py          # thin Azure Function wrapper (trigger → call IngestService)
+      report_function.py          # thin Cosmos-trigger wrapper (trigger → call ReportService)
+
+  domain/
+    enums.py                      # DocumentTypes, Status, YearEnum (and optionally SectionId)
+    value_objects.py              # FiscalPeriod, DocumentDate (parsing/normalization rules)
+    dto.py                        # boundary payloads: ReportRequest, UploadResponse, IngestDocumentResponse
+    models/
+      counterparty.py             # Counterparty, CounterpartyFile (company + file metadata)
+      adjustments.py              # Adjustment, MetricAdjustments, AdjustmentDoc, JSONDoc (JSON financials)
+      report_models.py            # Report, PromptResponse, SectionSummary, Citation (report contracts)
+      pipeline_status.py          # PipelineStep, PipelineRun (run tracking models)
+
+  parsing/
+    filename.py                   # extract_ccif + blob/path parsing helpers
+    doc_type_detector.py          # DOC_TYPE_PATTERNS + detect() (infer doc type from filename)
+    pdf_extract.py                # LLM-based extraction from first-page text (structured models)
+    json_preprocess.py            # preprocess_json → AdjustmentDoc (reshape CAR JSON to domain)
+
+  services/
+    ingest_service.py             # orchestration: blob → metadata → LLM extract → cosmos upsert
+    report_service.py             # orchestration: validate → retrieve → generate sections → upload report
+    document_validation.py        # doc-date selection rules (10-K/10-Q/ratings recency constraints)
+    embedding_service.py          # should_embed/check_embeddings policy wrapper
+    metadata_service.py           # load_counterparty_df + lookup_metadata (ccif → industry/subindustry)
+    sections/
+      base.py                     # SectionGenerator interface + SectionResult contract
+      registry.py                 # SectionId → SectionGenerator mapping
+      company_overview.py         # Company Overview section generator (uses PromptLC + retrieval)
+
+  adapters/
+    storage/
+      blob_store.py               # Azure Blob IO (download/list/read counterparty/docs)
+    persistence/
+      cosmos_repo.py              # generic cosmos upserts (upload_to_cosmos, mapping table updates)
+      cosmos_reports_repo.py      # report-specific cosmos ops (fetch docs, upload_car_report)
+      pipeline_run_repo.py        # run/status persistence (update_run_status, check_in_progress)
+    search/
+      azure_search_repo.py        # Azure AI Search/vector retrieval (build_filter + query)
+    http/
+      graph_extractor_client.py   # external graph extraction call (httpx client wrapper)
+
+  core/
+    config.py                     # config loading (ini/env) → typed config object
+    clients.py                    # init_clients: cosmos/blob/openai/search clients
+    telemetry.py                  # tracer helpers + span utilities
+    logging.py                    # logging setup (formatters/levels)
+
+prompt_lifecycle/
+  config/                         # industry_map + KPI packs/registry + routing/policies config
+  prompts/                        # versioned prompt templates per section (e.g., company_overview/*)
+  engine/                         # prompt loading/routing + LLM client + guardrails/retry runtime
+  eval/                           # eval harness (optional)
+  cli/                            # CLI entrypoints for running/resolving prompts
+  telemetry/                      # prompt-level metrics + trace correlation hooks
