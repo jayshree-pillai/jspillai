@@ -1,0 +1,30 @@
+
+claim_dictionary 
+industry – e.g., Healthcare, Technology
+•sub_industry – e.g., Life Sciences Tools & Diagnostics, Software - B2B SaaS
+•metric_key – name (stable key)
+•critical – Y/N (missing this should hurt score more)
+•keyword_triggers – phrases that indicate the metric is being discussed
+•allowed_units – (pct, bps, usd_bn, usd_mn, x, count, months)
+•required_periods – (FY, LTM, Q, Y)
+•value_required – Y/N (some metrics can be mentioned qualitatively; most should be Y)
+{"k":"ebitda_margin", "u":["pct","bps"], "kw":["EBITDA margin","operating margin"]}
+
+Section_topic_dictionary
+Purpose: tells the system what topics must be covered for each section (even if no numbers). This powers “coverage scoring”.
+•section_type – one of: company_overview,operating_performance, industry_trends, key_risks, key_mitigants
+•industry
+•sub_industry
+•topic_key – canonical coverage bucket name
+•required – Y/N (must hit or fail/cap)
+•keywords –
+•min_hits – usually 1 (or more if you want stronger evidence)
+{"t":"regulatory_quality", "kw":["FDA","recall","compliance"]}
+
+Entity_aliases
+•	industry
+•	sub_industry
+•	canon_entity – the canonical name your system will use (stable key)
+
+•	entity_type – e.g., ORG, SEGMENT, PRODUCT, METRIC, DOC, GEO
+•	alias – one alias per row
