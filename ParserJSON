@@ -1,0 +1,140 @@
+{
+  "version": "1.0",
+
+  "norm": {
+    "period": {
+      "FY21": "FY2021",
+      "FY22": "FY2022",
+      "1Q22": "2022Q1",
+      "Q1 2022": "2022Q1",
+      "LTM 1Q22": "LTM_2022Q1",
+      "LTM": "LTM"
+    },
+    "unit": {
+      "$": "usd",
+      "bn": "usd_bn",
+      "mn": "usd_mn",
+      "%": "pct",
+      "bps": "bps",
+      "x": "x",
+      "months": "months",
+      "facilities": "count",
+      "countries": "count"
+    },
+    "entity": {
+      "DBS": "DANAHER_BUSINESS_SYSTEM",
+      "Danaher Business System": "DANAHER_BUSINESS_SYSTEM",
+      "NRR": "NET_REVENUE_RETENTION",
+      "NDR": "NET_REVENUE_RETENTION",
+      "ARR": "ANNUAL_RECURRING_REVENUE"
+    }
+  },
+
+  "taxonomy": {
+    "Healthcare|Life Sciences Tools & Diagnostics": {
+      "metrics": [
+        {
+          "k": "revenue_growth_yoy",
+          "crit": true,
+          "u": ["pct"],
+          "p": ["FY", "LTM", "Q"],
+          "kw": ["revenue growth", "sales growth", "YoY revenue", "organic growth"]
+        },
+        {
+          "k": "ebitda_margin",
+          "crit": true,
+          "u": ["pct", "bps"],
+          "p": ["FY", "LTM", "Q"],
+          "kw": ["EBITDA margin", "operating margin", "gross margin"]
+        },
+        {
+          "k": "recurring_revenue_pct",
+          "crit": true,
+          "u": ["pct"],
+          "p": ["FY", "LTM"],
+          "kw": ["recurring revenue", "consumables", "service revenue", "aftermarket"]
+        },
+        {
+          "k": "segment_mix",
+          "crit": true,
+          "u": ["pct", "usd", "usd_mn", "usd_bn"],
+          "p": ["FY", "LTM"],
+          "kw": ["segment mix", "segment contribution", "revenue by segment", "represented % of revenue"]
+        },
+        {
+          "k": "leverage_net_debt_ebitda",
+          "crit": true,
+          "u": ["x"],
+          "p": ["FY", "LTM", "Q"],
+          "kw": ["net leverage", "net debt/EBITDA", "gross leverage"]
+        }
+      ],
+      "checklists": {
+        "key_risks": {
+          "req": [
+            { "t": "regulatory_quality", "kw": ["FDA", "regulatory", "quality", "recall", "compliance"] },
+            { "t": "integration_mna", "kw": ["integration", "acquisition", "synergies", "bolt-on"] }
+          ],
+          "min_hit": 3
+        }
+      }
+    },
+
+    "Technology|Software - B2B SaaS": {
+      "metrics": [
+        {
+          "k": "arr",
+          "crit": true,
+          "u": ["usd", "usd_mn", "usd_bn"],
+          "p": ["FY", "Q"],
+          "kw": ["ARR", "annual recurring revenue"]
+        },
+        {
+          "k": "net_revenue_retention",
+          "crit": true,
+          "u": ["pct"],
+          "p": ["FY", "Q"],
+          "kw": ["NRR", "net revenue retention", "NDR", "net dollar retention"]
+        },
+        {
+          "k": "gross_margin",
+          "crit": true,
+          "u": ["pct", "bps"],
+          "p": ["FY", "Q"],
+          "kw": ["gross margin"]
+        },
+        {
+          "k": "churn",
+          "crit": true,
+          "u": ["pct"],
+          "p": ["FY", "Q"],
+          "kw": ["churn", "logo churn", "gross churn"]
+        },
+        {
+          "k": "cac_payback_months",
+          "crit": false,
+          "u": ["months"],
+          "p": ["FY", "Q"],
+          "kw": ["CAC payback", "payback period"]
+        }
+      ],
+      "checklists": {
+        "operating_performance": {
+          "req": [
+            { "t": "growth", "kw": ["revenue", "ARR", "growth", "YoY"] },
+            { "t": "retention_churn", "kw": ["NRR", "retention", "churn"] },
+            { "t": "profitability", "kw": ["gross margin", "EBITDA", "cash flow", "FCF"] },
+            { "t": "drivers", "kw": ["driven by", "due to", "offset by", "reflecting"] }
+          ]
+        }
+      }
+    }
+  },
+
+  "rules": {
+    "md_tokens": ["###", "**", "`"],
+    "tol": { "pct": 0.3, "bps": 10, "usd_bn": 0.01, "usd_mn": 0.05, "x": 0.1, "months": 1 },
+    "period_exact": true,
+    "max_new_nums_no_src": 2
+  }
+}
