@@ -1,54 +1,36 @@
-Feature: Run a named pack and assemble a draft report (registry-driven)
-This covers running env+pack, resolving sections via registry before work starts, ordered execution, summary, and fail-fast vs continue-on-error.
+Feature: Select LLM model from configuration by environment
+This covers defining models in config, deterministic env-based selection, optional override, and fail-fast when misconfigured.
 
-Scenario: Run a known pack executes sections in pack order and assembles report
-Given an environment "dev" is selected
-And a pack named "car_full" is defined with sections in order: "company_overview", "key_risks", "financial_summary"
-And each section_id in the pack is registered in the Section Registry
-When I run pack "car_full" in environment "dev"
-Then the system resolves all section bindings via the Section Registry before running
-And the system executes "company_overview" before "key_risks"
-And the system executes "key_risks" before "financial_summary"
-And the assembled report preserves that same order
+Scenario: Runtime selects the model deterministically based on env
+Given models are defined in configuration with stable model_ids and deployment settings
+And environment "dev" is configured to use model_id "model_dev"
+When I run a section in environment "dev"
+Then the runtime selects model_id "model_dev"
+And the selected model_id is recorded in the run output/telemetry
 
-Scenario: Unknown pack fails fast before any LLM work starts
-Given no pack named "unknown_pack" exists
-When I run pack "unknown_pack"
-Then the system returns an "UNKNOWN_PACK" error
-And no LLM work is started
+Scenario: Runtime selects a different model for a different env
+Given environment "prod" is configured to use model_id "model_prod"
+When I run a section in environment "prod"
+Then the runtime selects model_id "model_prod"
+And the selected model_id is recorded in the run output/telemetry
 
-Scenario: Pack containing an unregistered section fails fast before any LLM work starts
-Given a pack named "car_full" includes section_id "unregistered_section"
-And "unregistered_section" is not present in the Section Registry
-When I run pack "car_full"
-Then the system returns an "UNKNOWN_SECTION" error identifying "unregistered_section"
-And no LLM work is started
+Scenario: Optional model override replaces the env default
+Given environment "dev" is configured to use model_id "model_dev"
+And model_id "model_override" exists in configuration
+When I run a section in environment "dev" with model override "model_override"
+Then the runtime selects model_id "model_override"
+And the run output/telemetry records that the override was applied
 
-Scenario: Optional prompt version override applies to the whole pack
-Given a pack named "car_full" is defined with registered sections
-And prompt version "v2025_01_10" exists for every section in the pack
-When I run pack "car_full" with prompt_version "v2025_01_10"
-Then each section run uses prompt_version "v2025_01_10"
-And the assembled report records the prompt_version used
+Scenario: Missing model configuration fails fast before any LLM call
+Given environment "dev" is configured to use model_id "model_dev"
+But no model configuration exists for model_id "model_dev"
+When I run a section in environment "dev"
+Then the runtime returns a "MODEL_CONFIG_NOT_FOUND" error
+And no LLM call is attempted
 
-Scenario: Default fail-fast stops on first section failure
-Given a pack named "car_full" is defined with registered sections
-And section "key_risks" fails during execution
-When I run pack "car_full" with default settings
-Then the run stops after "key_risks" fails
-And the assembled report marks "key_risks" as failed
-And the overall run returns failure status
-
-Scenario: Continue-on-error records failures and continues
-Given a pack named "car_full" is defined with registered sections
-And section "key_risks" fails during execution
-When I run pack "car_full" with continue-on-error enabled
-Then the run continues to execute remaining sections after "key_risks"
-And the final summary lists "key_risks" as failed and others as succeeded/failed accordingly
-And the overall run returns failure status
-
-Scenario: End-of-run summary includes per-section status and output location
-Given a pack named "car_full" is defined with registered sections
-When I run pack "car_full"
-Then the system prints a short summary showing success/fail per section
-And the summary includes where outputs were written
+Scenario: Invalid model configuration fails fast before any LLM call
+Given a model configuration exists for model_id "model_dev"
+But the configuration is invalid or incomplete
+When the runtime loads model configuration for environment "dev"
+Then the runtime returns a "MODEL_CONFIG_INVALID" error
+And no LLM call is attempted
