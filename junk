@@ -1,20 +1,13 @@
-US-05 — Run a pack (registry-driven) and assemble output
+As a Compliance/Quality Owner, I want a single HIGH strictness policy profile to be defined in configuration and applied uniformly to every section run, so credit-analytics report generation is consistently safe, accurate, and auditable without code changes.
 
-User story
-As a user, I want to run a named pack (ordered section_ids) and get an assembled report, so I can generate a draft report in one command.
+Acceptance criteria
 
-Acceptance criteria (tight, implementation-agnostic)
+A single policy profile = HIGH is defined in configuration (one source of truth).
 
-User can run: env + pack name (prompt version override optional).
+Runtime loads and validates the policy profile before any LLM call; invalid/missing policy config fails fast with a clear error.
 
-System resolves every section_id via Section Registry (US-01) before running.
+The HIGH policy profile is applied to every section execution (no per-section overrides).
 
-Unknown pack or unknown section_id ⇒ fail fast with a clear error (no LLM work starts).
+Runtime records in run output/telemetry: policy_profile (HIGH) and a policy_version (or hash) for auditability.
 
-Sections run in pack order; assembled report preserves that order.
-
-End of run prints a short summary: success/fail per section + where outputs were written.
-
-Default is fail-fast on first section failure; optional continue-on-error records failures and continues.
-
-Overall run returns failure status if any section failed.
+Any policy violation is returned as a structured failure reason (e.g., POLICY_VIOLATION) and is logged consistently.
