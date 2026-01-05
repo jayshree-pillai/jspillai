@@ -1,36 +1,51 @@
-Feature: Select LLM model from configuration by environment
-This covers defining models in config, deterministic env-based selection, optional override, and fail-fast when misconfigured.
+Feature: Centralized retry policy for transient LLM failures
+This covers one retry policy definition, allowlisted retryable errors, structured failure output, telemetry, and non-retryable error handling.
 
-Scenario: Runtime selects the model deterministically based on env
-Given models are defined in configuration with stable model_ids and deployment settings
-And environment "dev" is configured to use model_id "model_dev"
-When I run a section in environment "dev"
-Then the runtime selects model_id "model_dev"
-And the selected model_id is recorded in the run output/telemetry
+Scenario: Retry policy is defined centrally and applied to all sections
+Given a centralized retry policy is configured with max_attempts and backoff
+And section_id "company_overview" is registered
+And section_id "key_risks" is registered
+When I run "company_overview" and then run "key_risks"
+Then both runs use the same configured retry policy
+And the retry behavior is consistent across sections
 
-Scenario: Runtime selects a different model for a different env
-Given environment "prod" is configured to use model_id "model_prod"
-When I run a section in environment "prod"
-Then the runtime selects model_id "model_prod"
-And the selected model_id is recorded in the run output/telemetry
+Scenario: Retry occurs only for allowlisted retryable error types/codes
+Given the retry policy defines retryable error code "RATE_LIMIT"
+And the LLM call for section_id "company_overview" returns "RATE_LIMIT" on the first attempt
+When I run section_id "company_overview"
+Then the LLM client retries according to max_attempts and backoff
+And the subsequent attempt is made
 
-Scenario: Optional model override replaces the env default
-Given environment "dev" is configured to use model_id "model_dev"
-And model_id "model_override" exists in configuration
-When I run a section in environment "dev" with model override "model_override"
-Then the runtime selects model_id "model_override"
-And the run output/telemetry records that the override was applied
+Scenario: Non-retryable errors do not trigger retries
+Given the retry policy has an explicit allowlist of retryable errors
+And the LLM call returns a non-retryable error "BAD_REQUEST"
+When I run a section
+Then the LLM client does not retry
+And the run fails immediately with outcome "FAILED"
 
-Scenario: Missing model configuration fails fast before any LLM call
-Given environment "dev" is configured to use model_id "model_dev"
-But no model configuration exists for model_id "model_dev"
-When I run a section in environment "dev"
-Then the runtime returns a "MODEL_CONFIG_NOT_FOUND" error
-And no LLM call is attempted
+Scenario: Schema validation failure does not trigger retries
+Given a section run produces output that fails schema validation
+When I run that section
+Then the system marks the section as failed due to "SCHEMA_VALIDATION_FAILED"
+And no LLM retry is attempted due to schema failure
 
-Scenario: Invalid model configuration fails fast before any LLM call
-Given a model configuration exists for model_id "model_dev"
-But the configuration is invalid or incomplete
-When the runtime loads model configuration for environment "dev"
-Then the runtime returns a "MODEL_CONFIG_INVALID" error
-And no LLM call is attempted
+Scenario: Guardrail/policy failure does not trigger retries
+Given a section run produces output that violates guardrails/policy
+When I run that section
+Then the system marks the section as failed due to "POLICY_VIOLATION"
+And no LLM retry is attempted due to guardrail failure
+
+Scenario: Exhausting retries returns structured failure details
+Given the retry policy is configured with max_attempts 3
+And each LLM attempt fails with a retryable error "TIMEOUT"
+When I run section_id "company_overview"
+Then the system returns a structured failure including attempts=3 and last_error="TIMEOUT"
+And the failure includes section_id "company_overview" and the resolved model_id
+
+Scenario: Telemetry records retry count and final outcome
+Given the retry policy is configured
+And the first LLM attempt fails with a retryable error
+And a subsequent retry succeeds
+When I run a section
+Then telemetry records the retry_count greater than 0
+And telemetry records the final outcome "SUCCEEDED"
