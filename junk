@@ -1,37 +1,37 @@
-Feature: Guardrails enforce policy on every section output before schema validation
-This covers running guardrails on every section, structured failures on violations, recording decisions, and no silent pass.
+Feature: Company Overview prompt selection from configuration
+  In order to produce a consistent Company Overview narrative structure
+  As a Credit Analyst
+  I want the Company Overview prompt to be selected by section_id from configuration
 
-Scenario: Guardrails run on every section output before schema validation
-Given a section run produces an output draft
-When the section output is processed
-Then the system applies guardrails to the output before schema validation
-And the system does not return/assemble results until guardrails complete
+  Scenario: Resolve Company Overview prompt from configuration
+    Given a configured mapping for section_id "company_overview"
+    And a prompt bundle exists for the mapped prompt_id and active version
+    When I request execution for section_id "company_overview"
+    Then the system resolves the prompt_id and prompt_version from configuration
+    And the resolved prompt_id and prompt_version are recorded in run metadata
 
-Scenario: Policy violation blocks the output and returns a structured failure
-Given guardrails are enabled
-And a section output violates a policy rule
-When guardrails evaluate the section output
-Then the system returns a structured failure "POLICY_VIOLATION"
-And the failure includes policy_rule_id (or rule name) and severity
-And the failure includes the action_taken ("block" or "fail")
+  Scenario: Preview the rendered Company Overview prompt before execution
+    Given a configured mapping for section_id "company_overview"
+    When I request a prompt preview for section_id "company_overview"
+    Then the system returns the fully rendered prompt text
+    And the preview includes the resolved prompt_id and prompt_version
 
-Scenario: Redaction action returns redacted output with an explicit status
-Given guardrails are enabled
-And a section output triggers a rule whose action is "redact"
-When guardrails evaluate the section output
-Then the system returns the redacted output
-And the system marks the guardrail status as "REDACTED"
-And schema validation runs on the redacted output
+  Scenario: Fail fast when Company Overview mapping is missing
+    Given no configured mapping exists for section_id "company_overview"
+    When I request execution for section_id "company_overview"
+    Then the system fails before any LLM call
+    And the error clearly states the missing/unmapped section_id
 
-Scenario: Passing guardrails proceeds to schema validation
-Given guardrails are enabled
-And a section output does not violate any policy rule
-When guardrails evaluate the section output
-Then the system marks guardrail status "PASS"
-And proceeds to schema validation
+  Scenario: Fail fast when configured prompt version is missing
+    Given a configured mapping exists for section_id "company_overview"
+    But the configured prompt version artifact does not exist
+    When I request execution for section_id "company_overview"
+    Then the system fails before any LLM call
+    And the error includes the prompt_id and prompt_version that could not be resolved
 
-Scenario: Guardrail decisions are recorded for auditability (no silent pass)
-Given a section is executed
-When the section completes (pass, redact, or fail)
-Then telemetry/logs record guardrail_status (PASS/REDACTED/FAIL)
-And telemetry/logs record the rule id/name, severity, and action_taken (if applicable)
+  Scenario: Validate Company Overview output against its spec
+    Given the Company Overview section output specification is defined
+    And the system has executed section_id "company_overview"
+    When the system validates the section output
+    Then the output passes validation only if it conforms to the specification
+    And on failure, a structured validation error is returned with failing fields/paths
