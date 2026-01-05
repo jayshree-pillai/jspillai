@@ -1,35 +1,36 @@
-Feature: Global HIGH policy profile is applied uniformly
-This covers loading/validating the HIGH policy profile, applying it to every section, structured violation handling, and audit logging.
+Feature: Offline evaluations for a section + prompt version (measurable quality before promotion)
+This covers running offline evals for a given section_id and prompt_version over a dataset, producing metrics + pass/fail deterministically, and failing clearly on missing datasets.
 
-Scenario: HIGH policy profile loads successfully from configuration
-Given a policy configuration exists defining a single policy profile "HIGH"
-When the runtime starts (or first uses policy config)
-Then the runtime loads policy profile "HIGH" successfully
-And the runtime makes "HIGH" available for section execution
+Scenario: Run offline eval for a section + prompt version using a specified dataset
+Given an evaluation dataset "ds_small_v1" exists
+And section_id "company_overview" exists
+And prompt_version "v2025_02_15" exists for that section
+When I run offline eval for section_id "company_overview" and prompt_version "v2025_02_15" against dataset "ds_small_v1"
+Then the eval run completes
+And it produces a machine-readable results artifact containing: section_id, prompt_version, dataset_id, metrics, pass_fail, and timestamp
 
-Scenario: Invalid policy configuration fails fast before any LLM call
-Given the policy configuration is missing or invalid
-When I attempt to run any section
-Then the system returns a "POLICY_CONFIG_INVALID" error
-And no LLM call is attempted
+Scenario: Run offline eval uses the same prompt loading logic as runtime (no duplication)
+Given section_id "company_overview" and prompt_version "v2025_02_15" exist
+When I run offline eval for that section/version
+Then the prompts used are loaded via the same mechanism used by runtime
+And the eval does not rely on a separate/duplicated prompt parsing or composition path
 
-Scenario: HIGH policy profile is applied to every section run
-Given policy profile "HIGH" is loaded successfully
-And section_id "company_overview" is registered
-And section_id "key_risks" is registered
-When I run section_id "company_overview"
-And I run section_id "key_risks"
-Then both section runs enforce the same policy profile "HIGH"
+Scenario: Pass/fail is determined from configured metric thresholds (deterministic)
+Given metric thresholds are defined in configuration
+And an eval run completes with computed metrics
+When the system determines pass/fail
+Then pass/fail is derived deterministically from the configured thresholds
+And the thresholds used are recorded in the results artifact (directly or by reference/version)
 
-Scenario: Runtime records policy profile and version for auditability
-Given policy profile "HIGH" is loaded successfully with a policy_version identifier
-When I run any section
-Then the run output or telemetry includes policy_profile "HIGH"
-And the run output or telemetry includes the policy_version identifier
+Scenario: Default dataset is used when dataset_id is omitted
+Given a default dataset is configured for section_id "company_overview"
+When I run offline eval for section_id "company_overview" and prompt_version "v2025_02_15" without specifying a dataset_id
+Then the system uses the configured default dataset
+And the results artifact records the dataset_id that was used
 
-Scenario: Policy violation returns structured failure and is logged
-Given policy profile "HIGH" is loaded successfully
-And the LLM output violates a policy rule enforced by "HIGH"
-When I run a section
-Then the system returns a structured failure reason "POLICY_VIOLATION"
-And the failure is logged with section_id and policy_profile "HIGH"
+Scenario: Missing/invalid dataset fails with a clear error
+Given dataset_id "ds_missing" does not exist
+When I run offline eval for section_id "company_overview" and prompt_version "v2025_02_15" against dataset "ds_missing"
+Then the eval fails with a clear error
+And the error includes the attempted dataset path/location
+And the error includes available dataset ids (or guidance on how to list them)
