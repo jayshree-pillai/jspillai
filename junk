@@ -1,21 +1,23 @@
-As a User, I want to define “packs” that specify which sections run, in what order, and with what defaults/overrides, so I can compose different report variants without changing code.
+As a Prompt Engineer, I want each section_id to have a governed prompt bundle with required metadata and versioned prompt variants, so prompt changes are controlled and runs are reproducible without code changes.
 
-Acceptance criteria (implementation-agnostic)
+Acceptance criteria
 
-The system supports named pack definitions that include:
+For every section_id, there exists a prompt bundle that contains:
 
-an ordered list of section_ids to execute
+Metadata describing the bundle (including section_id, owner, active_version, output_schema_ref)
 
-optional pack-level defaults and/or per-section overrides (inputs, policies, model choice, etc.)
+One or more versioned prompt artifacts, each uniquely identified by a version
 
-The runtime can execute a pack by name and will run sections in the declared order.
+If a version is requested explicitly, the system uses that exact version.
 
-If a pack references an unknown/unregistered section_id, execution fails before any LLM calls with a clear “unknown section in pack” error.
+If no version is provided, the system deterministically uses the bundle’s active version.
 
-A successful pack run returns a structured result that includes:
+The system detects and rejects:
 
-each section’s output keyed by section_id
+missing/invalid bundle metadata
 
-run metadata sufficient to reproduce the run (e.g., which pack, which section versions/policies were applied)
+an active_version that does not exist
 
-Pack definitions can be added/edited to create new report variants without modifying core orchestration logic.
+duplicate/conflicting versions
+
+Adding a new prompt version requires only adding a new versioned prompt artifact and (optionally) updating active_version—no code changes
