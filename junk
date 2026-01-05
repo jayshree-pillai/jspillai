@@ -1,45 +1,36 @@
-Feature: Governed prompt bundles (versioned prompts + required metadata)
-This covers prompt bundle metadata, exact-version loading, active-version loading, and fast-fail validation of bundle integrity.
+Gherkin
 
-Scenario: Load prompt by explicit version returns that exact version
-Given a prompt bundle exists for section_id "company_overview" with versioned prompts including "v2025_01_10"
-And the bundle metadata is valid
-When I load the prompt for section_id "company_overview" with version "v2025_01_10"
-Then the system returns prompt_version "v2025_01_10"
-And the prompt text is loaded successfully
+Feature: Single entrypoint runs any section via a uniform pipeline
+This covers one execution API, consistent ordering, and no section-specific branching.
 
-Scenario: Load prompt without version uses deterministic active_version
-Given a prompt bundle exists for section_id "company_overview"
-And the bundle metadata defines active_version "v2025_02_15"
-When I load the prompt for section_id "company_overview" without providing a version
-Then the system returns prompt_version "v2025_02_15"
-And the prompt text is loaded successfully
+Scenario: Run a known section follows the standard pipeline
+Given section_id "company_overview" is registered with valid bindings
+And the prompt for "company_overview" can be loaded
+And the LLM service is available
+When I run section_id "company_overview" through the single entrypoint
+Then the system resolves the section from the registry
+And loads the prompt for the section
+And calls the LLM
+And applies guardrails/policies
+And validates the output against the section schema
+And emits telemetry for the run
+And returns a successful section result
 
-Scenario: Missing or invalid bundle metadata fails fast
-Given a prompt bundle exists for section_id "company_overview"
-And the bundle metadata is missing or invalid
-When I attempt to load any prompt for section_id "company_overview"
-Then the system returns a "BUNDLE_METADATA_INVALID" error
+Scenario: Unknown section fails fast before any LLM call
+Given section_id "unknown_section" is not registered
+When I run section_id "unknown_section" through the single entrypoint
+Then the system returns an "UNKNOWN_SECTION" error
 And no LLM call is attempted
 
-Scenario: active_version points to a non-existent prompt version fails fast
-Given a prompt bundle exists for section_id "company_overview"
-And the bundle metadata defines active_version "v2099_01_01"
-And no prompt artifact exists for version "v2099_01_01"
-When I load the prompt for section_id "company_overview" without providing a version
-Then the system returns an "ACTIVE_VERSION_NOT_FOUND" error
-And the error includes section_id "company_overview" and active_version "v2099_01_01"
+Scenario: Pipeline order is consistent across different sections
+Given section_id "company_overview" is registered with valid bindings
+And section_id "key_risks" is registered with valid bindings
+When I run "company_overview" through the single entrypoint
+And I run "key_risks" through the single entrypoint
+Then both runs execute the same ordered steps: resolve, load prompt, call LLM, apply guardrails, validate schema, emit telemetry
 
-Scenario: Duplicate or conflicting versions are rejected
-Given a prompt bundle exists for section_id "company_overview"
-And two prompt artifacts resolve to the same prompt_version "v2025_01_10"
-When the system validates or loads the prompt bundle for "company_overview"
-Then the system returns a "DUPLICATE_PROMPT_VERSION" error
-And the error identifies the conflicting version "v2025_01_10"
-
-Scenario: Adding a new prompt version requires no orchestration code change
-Given a prompt bundle exists for section_id "company_overview" with active_version "v2025_01_10"
-When I add a new versioned prompt artifact "v2025_02_15" to the bundle
-And I update the bundle metadata active_version to "v2025_02_15"
-Then loading the prompt without a version returns "v2025_02_15"
-And the system behavior changes without modifying core orchestration code
+Scenario: No section-specific branching is required to add a new section
+Given a new section_id "new_section" is added to the registry with valid schema and prompt bundle
+When I run section_id "new_section" through the single entrypoint
+Then the system executes it using the same pipeline as other sections
+And the runtime does not require section-specific branching logic to support "new_section"
