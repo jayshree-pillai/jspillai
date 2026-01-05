@@ -1,17 +1,21 @@
-As a Platform, I want a registry of supported section_ids with their schema binding(s) and prompt bundle reference, so the runtime can execute any section without hardcoding section-specific logic.
+As a User, I want to define “packs” that specify which sections run, in what order, and with what defaults/overrides, so I can compose different report variants without changing code.
 
 Acceptance criteria (implementation-agnostic)
 
-The system maintains a single source of truth registry where each supported section_id is mapped to:
+The system supports named pack definitions that include:
 
-an output schema reference (and input schema reference if input validation is in scope)
+an ordered list of section_ids to execute
 
-a prompt bundle reference (location/identifier)
+optional pack-level defaults and/or per-section overrides (inputs, policies, model choice, etc.)
 
-The runtime provides a standard way to resolve section_id → SectionSpec (the resolved spec includes at least section_id, schema ref(s), prompt bundle ref).
+The runtime can execute a pack by name and will run sections in the declared order.
 
-If a section_id is not registered, the run fails before any LLM call with a clear “unknown section” error.
+If a pack references an unknown/unregistered section_id, execution fails before any LLM calls with a clear “unknown section in pack” error.
 
-When a registered section is resolved, the system performs a pre-flight integrity check that required references (schema + prompt bundle) are resolvable; otherwise it fails with a clear “missing/invalid reference” error before any LLM call.
+A successful pack run returns a structured result that includes:
 
-A new section can be made runnable by adding registry entry + schema + prompt bundle, without changing the core orchestration pipeline.
+each section’s output keyed by section_id
+
+run metadata sufficient to reproduce the run (e.g., which pack, which section versions/policies were applied)
+
+Pack definitions can be added/edited to create new report variants without modifying core orchestration logic.
