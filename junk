@@ -1,36 +1,25 @@
-Feature: Offline evaluations for a section + prompt version (measurable quality before promotion)
-This covers running offline evals for a given section_id and prompt_version over a dataset, producing metrics + pass/fail deterministically, and failing clearly on missing datasets.
+Feature: Structured audit logs for every section run (repro + debugging)
+This covers emitting an event per section run, consistent correlation_id end-to-end, success+failure coverage, and structured (not freeform) logging.
 
-Scenario: Run offline eval for a section + prompt version using a specified dataset
-Given an evaluation dataset "ds_small_v1" exists
-And section_id "company_overview" exists
-And prompt_version "v2025_02_15" exists for that section
-When I run offline eval for section_id "company_overview" and prompt_version "v2025_02_15" against dataset "ds_small_v1"
-Then the eval run completes
-And it produces a machine-readable results artifact containing: section_id, prompt_version, dataset_id, metrics, pass_fail, and timestamp
+Scenario: Emit a structured event for every section run
+Given a section run is started
+When the section run completes (success or failure)
+Then the system emits a structured log/event that includes at least: correlation_id, section_id, prompt_id, prompt_version, policy_version, model_id, latency_ms, tokens_in, tokens_out, and outcome
 
-Scenario: Run offline eval uses the same prompt loading logic as runtime (no duplication)
-Given section_id "company_overview" and prompt_version "v2025_02_15" exist
-When I run offline eval for that section/version
-Then the prompts used are loaded via the same mechanism used by runtime
-And the eval does not rely on a separate/duplicated prompt parsing or composition path
+Scenario: Emit events on both success and failure (no silent drops)
+Given a section run fails due to any error (including an uncaught exception)
+When the failure occurs
+Then the system still emits a structured log/event for that section run
+And the event outcome is "FAILED"
+And the event includes an error classification/code
 
-Scenario: Pass/fail is determined from configured metric thresholds (deterministic)
-Given metric thresholds are defined in configuration
-And an eval run completes with computed metrics
-When the system determines pass/fail
-Then pass/fail is derived deterministically from the configured thresholds
-And the thresholds used are recorded in the results artifact (directly or by reference/version)
+Scenario: correlation_id is consistent across the entire execution path
+Given a pack run is started and assigned correlation_id "corr-123"
+When the system executes section "company_overview" within that run
+Then logs/events emitted by CLI, runtime, LLM client, and telemetry for that section share correlation_id "corr-123"
 
-Scenario: Default dataset is used when dataset_id is omitted
-Given a default dataset is configured for section_id "company_overview"
-When I run offline eval for section_id "company_overview" and prompt_version "v2025_02_15" without specifying a dataset_id
-Then the system uses the configured default dataset
-And the results artifact records the dataset_id that was used
-
-Scenario: Missing/invalid dataset fails with a clear error
-Given dataset_id "ds_missing" does not exist
-When I run offline eval for section_id "company_overview" and prompt_version "v2025_02_15" against dataset "ds_missing"
-Then the eval fails with a clear error
-And the error includes the attempted dataset path/location
-And the error includes available dataset ids (or guidance on how to list them)
+Scenario: Logs are structured (machine-readable), not freeform strings
+Given a section run produces logs
+When I inspect the emitted logs/events
+Then each log/event is machine-readable (JSON or key-value)
+And required fields can be parsed without relying on string matching
