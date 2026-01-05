@@ -1,13 +1,21 @@
-As a Compliance/Quality Owner, I want a single HIGH strictness policy profile to be defined in configuration and applied uniformly to every section run, so credit-analytics report generation is consistently safe, accurate, and auditable without code changes.
+As an Eval Engineer, I want offline evaluations to produce both quantitative scores and qualitative assessments, so I can measure performance and understand why a prompt version is better before promotion.
 
-Acceptance criteria
+Acceptance criteria (noise-cut, implementation-agnostic)
 
-A single policy profile = HIGH is defined in configuration (one source of truth).
+Eval produces quantitative metrics (numeric) per example and aggregated (e.g., schema pass rate, coverage %, citation/grounding rate, hallucination flags count, length/format compliance, etc.).
 
-Runtime loads and validates the policy profile before any LLM call; invalid/missing policy config fails fast with a clear error.
+Eval produces qualitative scoring per example and aggregated (e.g., rubric-based ratings like 1–5 for clarity, correctness, completeness, conciseness, tone).
 
-The HIGH policy profile is applied to every section execution (no per-section overrides).
+A single machine-readable results artifact includes:
 
-Runtime records in run output/telemetry: policy_profile (HIGH) and a policy_version (or hash) for auditability.
+identifiers: section_id, prompt_version, dataset_id
 
-Any policy violation is returned as a structured failure reason (e.g., POLICY_VIOLATION) and is logged consistently.
+quant_metrics (per-example + aggregate)
+
+qual_scores (per-example + aggregate)
+
+overall pass_fail driven by configured thresholds on the quantitative metrics (and optionally minimum qualitative rating thresholds if you choose).
+
+Scoring method/rubric version used for qualitative scoring is recorded in the results artifact.
+
+If scoring cannot be computed (missing rubric/config/dataset), eval fails with a clear error.
