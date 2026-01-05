@@ -1,34 +1,37 @@
-Feature: Section outputs are validated against section schemas
-This covers per-section schemas, validation after guardrails, structured validation errors, success criteria, and telemetry recording.
+Feature: Guardrails enforce policy on every section output before schema validation
+This covers running guardrails on every section, structured failures on violations, recording decisions, and no silent pass.
 
-Scenario: Each section has a schema to validate required fields and types
-Given section_id "company_overview" is registered with an output schema
-When I request the schema binding for "company_overview"
-Then the system can resolve the schema used to validate that section’s output
-
-Scenario: Schema validation runs after guardrails and before marking success
+Scenario: Guardrails run on every section output before schema validation
 Given a section run produces an output draft
-And guardrails complete with status "PASS" or "REDACTED"
-When the system processes the section output
-Then schema validation runs after guardrails
-And the section is not marked successful until schema validation passes
+When the section output is processed
+Then the system applies guardrails to the output before schema validation
+And the system does not return/assemble results until guardrails complete
 
-Scenario: Schema validation failure returns a structured error
-Given section_id "company_overview" has an output schema
-And the produced output is missing a required field
-When schema validation is performed
-Then the system returns a "SCHEMA_VALIDATION_FAILED" error
-And the error includes section_id
-And the error includes failing field path(s) and validation message(s)
+Scenario: Policy violation blocks the output and returns a structured failure
+Given guardrails are enabled
+And a section output violates a policy rule
+When guardrails evaluate the section output
+Then the system returns a structured failure "POLICY_VIOLATION"
+And the failure includes policy_rule_id (or rule name) and severity
+And the failure includes the action_taken ("block" or "fail")
 
-Scenario: Section run is marked successful only if schema validation passes
-Given section_id "company_overview" has an output schema
-When I run section_id "company_overview"
-Then the section outcome is "SUCCESS" only if schema validation passes
-And if schema validation fails, the section outcome is "FAILED"
+Scenario: Redaction action returns redacted output with an explicit status
+Given guardrails are enabled
+And a section output triggers a rule whose action is "redact"
+When guardrails evaluate the section output
+Then the system returns the redacted output
+And the system marks the guardrail status as "REDACTED"
+And schema validation runs on the redacted output
 
-Scenario: Telemetry records schema_valid for every section run (no silent pass)
+Scenario: Passing guardrails proceeds to schema validation
+Given guardrails are enabled
+And a section output does not violate any policy rule
+When guardrails evaluate the section output
+Then the system marks guardrail status "PASS"
+And proceeds to schema validation
+
+Scenario: Guardrail decisions are recorded for auditability (no silent pass)
 Given a section is executed
-When the run completes (success or failure)
-Then telemetry records schema_valid as true or false for that section run
-And schema_valid is present for every section run
+When the section completes (pass, redact, or fail)
+Then telemetry/logs record guardrail_status (PASS/REDACTED/FAIL)
+And telemetry/logs record the rule id/name, severity, and action_taken (if applicable)
