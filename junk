@@ -1,21 +1,34 @@
-As an Eval Engineer, I want offline evaluations to produce both quantitative scores and qualitative assessments, so I can measure performance and understand why a prompt version is better before promotion.
+Feature: Section registry and binding validation
+This covers discovering supported sections, resolving their bindings, and failing fast when registry/bindings are invalid.
 
-Acceptance criteria (noise-cut, implementation-agnostic)
+Scenario: Lookup a registered section returns its bindings
+Given the section registry contains an entry for section_id "company_overview" with a valid output schema reference and prompt bundle location
+When I request the section spec for "company_overview"
+Then the system returns the section spec containing section_id, output_schema_ref, and prompt_bundle_path
 
-Eval produces quantitative metrics (numeric) per example and aggregated (e.g., schema pass rate, coverage %, citation/grounding rate, hallucination flags count, length/format compliance, etc.).
+Scenario: Unknown section fails fast before any LLM call
+Given the section registry does not contain an entry for section_id "unknown_section"
+When I attempt to run section_id "unknown_section"
+Then the system returns an "UNKNOWN_SECTION" error
+And no LLM call is attempted
 
-Eval produces qualitative scoring per example and aggregated (e.g., rubric-based ratings like 1–5 for clarity, correctness, completeness, conciseness, tone).
+Scenario: Missing schema binding fails fast before any LLM call
+Given the section registry contains an entry for section_id "company_overview"
+And the referenced output schema cannot be resolved
+When I attempt to resolve bindings for "company_overview"
+Then the system returns a "SCHEMA_NOT_FOUND" error
+And no LLM call is attempted
 
-A single machine-readable results artifact includes:
+Scenario: Missing prompt bundle fails fast before any LLM call
+Given the section registry contains an entry for section_id "company_overview"
+And the referenced prompt bundle location cannot be resolved
+When I attempt to resolve bindings for "company_overview"
+Then the system returns a "PROMPT_BUNDLE_NOT_FOUND" error
+And no LLM call is attempted
 
-identifiers: section_id, prompt_version, dataset_id
-
-quant_metrics (per-example + aggregate)
-
-qual_scores (per-example + aggregate)
-
-overall pass_fail driven by configured thresholds on the quantitative metrics (and optionally minimum qualitative rating thresholds if you choose).
-
-Scoring method/rubric version used for qualitative scoring is recorded in the results artifact.
-
-If scoring cannot be computed (missing rubric/config/dataset), eval fails with a clear error.
+Scenario: List supported sections comes from the registry
+Given the section registry contains enabled sections "company_overview" and "key_risks"
+And the section registry contains a disabled section "experimental_section"
+When I list supported sections
+Then the result includes "company_overview" and "key_risks"
+And the result does not include "experimental_section"
