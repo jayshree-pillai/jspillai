@@ -1,37 +1,41 @@
-Feature: Company Overview prompt selection from configuration
-  In order to produce a consistent Company Overview narrative structure
-  As a Credit Analyst
-  I want the Company Overview prompt to be selected by section_id from configuration
+Feature: Offline evaluation of a section prompt version against a dataset
+  Background:
+    Given offline evaluation is available for section outputs
+    And datasets are stored and discoverable by dataset_id (or file id/path)
 
-  Scenario: Resolve Company Overview prompt from configuration
-    Given a configured mapping for section_id "company_overview"
-    And a prompt bundle exists for the mapped prompt_id and active version
-    When I request execution for section_id "company_overview"
-    Then the system resolves the prompt_id and prompt_version from configuration
-    And the resolved prompt_id and prompt_version are recorded in run metadata
+  Scenario: Run eval with explicit section, prompt version, and dataset
+    Given section_id "company_overview" exists
+    And prompt_version "v2026_01_05" exists for section_id "company_overview"
+    And dataset_id "ds_credit_core_v1" exists
+    When I run an offline eval with section_id "company_overview", prompt_version "v2026_01_05", dataset_id "ds_credit_core_v1"
+    Then the eval uses the same prompt-loading mechanism as runtime
+    And the eval produces a machine-readable results artifact containing:
+      | section_id     |
+      | prompt_version |
+      | dataset_id     |
+      | metrics        |
+      | pass_fail      |
+      | timestamp      |
 
-  Scenario: Preview the rendered Company Overview prompt before execution
-    Given a configured mapping for section_id "company_overview"
-    When I request a prompt preview for section_id "company_overview"
-    Then the system returns the fully rendered prompt text
-    And the preview includes the resolved prompt_id and prompt_version
+  Scenario: Run eval with default dataset when dataset_id is omitted
+    Given section_id "company_overview" exists
+    And prompt_version "v2026_01_05" exists for section_id "company_overview"
+    And a default dataset is configured for section_id "company_overview"
+    When I run an offline eval with section_id "company_overview" and prompt_version "v2026_01_05" without dataset_id
+    Then the eval uses the configured default dataset
+    And the eval produces a machine-readable results artifact
 
-  Scenario: Fail fast when Company Overview mapping is missing
-    Given no configured mapping exists for section_id "company_overview"
-    When I request execution for section_id "company_overview"
-    Then the system fails before any LLM call
-    And the error clearly states the missing/unmapped section_id
+  Scenario: Pass/fail is derived deterministically from configured thresholds
+    Given an eval threshold configuration exists for section_id "company_overview"
+    And the thresholds are not hardcoded in the evaluator
+    When an offline eval completes
+    Then pass_fail is computed deterministically from the produced metrics and the configured thresholds
+    And the results artifact includes the computed pass_fail
 
-  Scenario: Fail fast when configured prompt version is missing
-    Given a configured mapping exists for section_id "company_overview"
-    But the configured prompt version artifact does not exist
-    When I request execution for section_id "company_overview"
-    Then the system fails before any LLM call
-    And the error includes the prompt_id and prompt_version that could not be resolved
-
-  Scenario: Validate Company Overview output against its spec
-    Given the Company Overview section output specification is defined
-    And the system has executed section_id "company_overview"
-    When the system validates the section output
-    Then the output passes validation only if it conforms to the specification
-    And on failure, a structured validation error is returned with failing fields/paths
+  Scenario: Fail fast when dataset is missing or invalid
+    Given section_id "company_overview" exists
+    And prompt_version "v2026_01_05" exists for section_id "company_overview"
+    When I run an offline eval with dataset_id "ds_missing"
+    Then the eval fails with a clear error
+    And the error includes the attempted dataset reference and available dataset ids (or how to list them)
+    And no results artifact is produced
