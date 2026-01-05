@@ -1,36 +1,54 @@
-Gherkin
+Feature: Run a named pack and assemble a draft report (registry-driven)
+This covers running env+pack, resolving sections via registry before work starts, ordered execution, summary, and fail-fast vs continue-on-error.
 
-Feature: Single entrypoint runs any section via a uniform pipeline
-This covers one execution API, consistent ordering, and no section-specific branching.
+Scenario: Run a known pack executes sections in pack order and assembles report
+Given an environment "dev" is selected
+And a pack named "car_full" is defined with sections in order: "company_overview", "key_risks", "financial_summary"
+And each section_id in the pack is registered in the Section Registry
+When I run pack "car_full" in environment "dev"
+Then the system resolves all section bindings via the Section Registry before running
+And the system executes "company_overview" before "key_risks"
+And the system executes "key_risks" before "financial_summary"
+And the assembled report preserves that same order
 
-Scenario: Run a known section follows the standard pipeline
-Given section_id "company_overview" is registered with valid bindings
-And the prompt for "company_overview" can be loaded
-And the LLM service is available
-When I run section_id "company_overview" through the single entrypoint
-Then the system resolves the section from the registry
-And loads the prompt for the section
-And calls the LLM
-And applies guardrails/policies
-And validates the output against the section schema
-And emits telemetry for the run
-And returns a successful section result
+Scenario: Unknown pack fails fast before any LLM work starts
+Given no pack named "unknown_pack" exists
+When I run pack "unknown_pack"
+Then the system returns an "UNKNOWN_PACK" error
+And no LLM work is started
 
-Scenario: Unknown section fails fast before any LLM call
-Given section_id "unknown_section" is not registered
-When I run section_id "unknown_section" through the single entrypoint
-Then the system returns an "UNKNOWN_SECTION" error
-And no LLM call is attempted
+Scenario: Pack containing an unregistered section fails fast before any LLM work starts
+Given a pack named "car_full" includes section_id "unregistered_section"
+And "unregistered_section" is not present in the Section Registry
+When I run pack "car_full"
+Then the system returns an "UNKNOWN_SECTION" error identifying "unregistered_section"
+And no LLM work is started
 
-Scenario: Pipeline order is consistent across different sections
-Given section_id "company_overview" is registered with valid bindings
-And section_id "key_risks" is registered with valid bindings
-When I run "company_overview" through the single entrypoint
-And I run "key_risks" through the single entrypoint
-Then both runs execute the same ordered steps: resolve, load prompt, call LLM, apply guardrails, validate schema, emit telemetry
+Scenario: Optional prompt version override applies to the whole pack
+Given a pack named "car_full" is defined with registered sections
+And prompt version "v2025_01_10" exists for every section in the pack
+When I run pack "car_full" with prompt_version "v2025_01_10"
+Then each section run uses prompt_version "v2025_01_10"
+And the assembled report records the prompt_version used
 
-Scenario: No section-specific branching is required to add a new section
-Given a new section_id "new_section" is added to the registry with valid schema and prompt bundle
-When I run section_id "new_section" through the single entrypoint
-Then the system executes it using the same pipeline as other sections
-And the runtime does not require section-specific branching logic to support "new_section"
+Scenario: Default fail-fast stops on first section failure
+Given a pack named "car_full" is defined with registered sections
+And section "key_risks" fails during execution
+When I run pack "car_full" with default settings
+Then the run stops after "key_risks" fails
+And the assembled report marks "key_risks" as failed
+And the overall run returns failure status
+
+Scenario: Continue-on-error records failures and continues
+Given a pack named "car_full" is defined with registered sections
+And section "key_risks" fails during execution
+When I run pack "car_full" with continue-on-error enabled
+Then the run continues to execute remaining sections after "key_risks"
+And the final summary lists "key_risks" as failed and others as succeeded/failed accordingly
+And the overall run returns failure status
+
+Scenario: End-of-run summary includes per-section status and output location
+Given a pack named "car_full" is defined with registered sections
+When I run pack "car_full"
+Then the system prints a short summary showing success/fail per section
+And the summary includes where outputs were written
