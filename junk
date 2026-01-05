@@ -1,0 +1,17 @@
+As a Platform, I want a registry of supported section_ids with their schema binding(s) and prompt bundle reference, so the runtime can execute any section without hardcoding section-specific logic.
+
+Acceptance criteria (implementation-agnostic)
+
+The system maintains a single source of truth registry where each supported section_id is mapped to:
+
+an output schema reference (and input schema reference if input validation is in scope)
+
+a prompt bundle reference (location/identifier)
+
+The runtime provides a standard way to resolve section_id → SectionSpec (the resolved spec includes at least section_id, schema ref(s), prompt bundle ref).
+
+If a section_id is not registered, the run fails before any LLM call with a clear “unknown section” error.
+
+When a registered section is resolved, the system performs a pre-flight integrity check that required references (schema + prompt bundle) are resolvable; otherwise it fails with a clear “missing/invalid reference” error before any LLM call.
+
+A new section can be made runnable by adding registry entry + schema + prompt bundle, without changing the core orchestration pipeline.
