@@ -1,59 +1,45 @@
-Feature: Pack definitions (sections + order + defaults/overrides)
-Packs define which sections run, in what order, and what defaults/overrides apply, enabling report variants without code changes.
+Feature: Governed prompt bundles (versioned prompts + required metadata)
+This covers prompt bundle metadata, exact-version loading, active-version loading, and fast-fail validation of bundle integrity.
 
-Scenario: Run a named pack executes sections in declared order
-Given a pack named "car_core" is defined with sections in order: "company_overview", "industry_map", "key_risks"
-And each listed section_id is registered in the section registry
-When I execute the pack "car_core"
-Then the system runs "company_overview" before "industry_map"
-And the system runs "industry_map" before "key_risks"
+Scenario: Load prompt by explicit version returns that exact version
+Given a prompt bundle exists for section_id "company_overview" with versioned prompts including "v2025_01_10"
+And the bundle metadata is valid
+When I load the prompt for section_id "company_overview" with version "v2025_01_10"
+Then the system returns prompt_version "v2025_01_10"
+And the prompt text is loaded successfully
 
-Scenario: Pack supports pack-level defaults applied to all sections
-Given a pack named "car_core" is defined with pack-level defaults
-And the pack includes section_id "company_overview" and "key_risks"
-When I execute the pack "car_core"
-Then the system applies the pack-level defaults to "company_overview"
-And the system applies the pack-level defaults to "key_risks"
+Scenario: Load prompt without version uses deterministic active_version
+Given a prompt bundle exists for section_id "company_overview"
+And the bundle metadata defines active_version "v2025_02_15"
+When I load the prompt for section_id "company_overview" without providing a version
+Then the system returns prompt_version "v2025_02_15"
+And the prompt text is loaded successfully
 
-Scenario: Per-section override takes precedence over pack-level defaults
-Given a pack named "car_core" is defined with a pack-level default "inputs.language" set to "en"
-And the pack defines a per-section override for section_id "key_risks" setting "inputs.language" to "fr"
-And all listed section_ids are registered in the section registry
-When I execute the pack "car_core"
-Then the system runs "company_overview" with "inputs.language" = "en"
-And the system runs "key_risks" with "inputs.language" = "fr"
-
-Scenario: Unknown pack fails fast before any section execution
-Given no pack named "unknown_pack" is defined
-When I execute the pack "unknown_pack"
-Then the system returns an "UNKNOWN_PACK" error
-And no section is executed
+Scenario: Missing or invalid bundle metadata fails fast
+Given a prompt bundle exists for section_id "company_overview"
+And the bundle metadata is missing or invalid
+When I attempt to load any prompt for section_id "company_overview"
+Then the system returns a "BUNDLE_METADATA_INVALID" error
 And no LLM call is attempted
 
-Scenario: Pack referencing an unregistered section fails fast before any LLM call
-Given a pack named "car_core" is defined with sections: "company_overview", "unregistered_section"
-And "unregistered_section" is not present in the section registry
-When I execute the pack "car_core"
-Then the system returns an "UNKNOWN_SECTION" error identifying "unregistered_section"
-And no LLM call is attempted
+Scenario: active_version points to a non-existent prompt version fails fast
+Given a prompt bundle exists for section_id "company_overview"
+And the bundle metadata defines active_version "v2099_01_01"
+And no prompt artifact exists for version "v2099_01_01"
+When I load the prompt for section_id "company_overview" without providing a version
+Then the system returns an "ACTIVE_VERSION_NOT_FOUND" error
+And the error includes section_id "company_overview" and active_version "v2099_01_01"
 
-Scenario: Successful pack run returns structured results keyed by section_id
-Given a pack named "car_core" is defined with sections: "company_overview", "key_risks"
-And all listed section_ids are registered in the section registry
-And both sections complete successfully
-When I execute the pack "car_core"
-Then the system returns a structured result containing outputs keyed by "company_overview" and "key_risks"
+Scenario: Duplicate or conflicting versions are rejected
+Given a prompt bundle exists for section_id "company_overview"
+And two prompt artifacts resolve to the same prompt_version "v2025_01_10"
+When the system validates or loads the prompt bundle for "company_overview"
+Then the system returns a "DUPLICATE_PROMPT_VERSION" error
+And the error identifies the conflicting version "v2025_01_10"
 
-Scenario: Pack run returns run metadata sufficient to reproduce the run
-Given a pack named "car_core" is defined with sections: "company_overview", "key_risks"
-And all listed section_ids are registered in the section registry
-When I execute the pack "car_core"
-Then the system returns run metadata including the pack name "car_core"
-And the system returns run metadata indicating which section versions/policies were applied
-
-Scenario: Adding or editing a pack creates a new report variant without code changes
-Given a new pack named "car_core_plus" is defined by adding section_id "financial_summary" to the end of "car_core"
-And all listed section_ids are registered in the section registry
-When I execute the pack "car_core_plus"
-Then the system runs the sections including "financial_summary"
-And no changes to orchestration code are required
+Scenario: Adding a new prompt version requires no orchestration code change
+Given a prompt bundle exists for section_id "company_overview" with active_version "v2025_01_10"
+When I add a new versioned prompt artifact "v2025_02_15" to the bundle
+And I update the bundle metadata active_version to "v2025_02_15"
+Then loading the prompt without a version returns "v2025_02_15"
+And the system behavior changes without modifying core orchestration code
