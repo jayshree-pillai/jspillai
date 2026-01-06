@@ -1,3 +1,43 @@
+US-01 (Section registry): Maintain a single registry of report sections so the runtime can resolve and execute any section by section_id without code branching.
+
+US-02 (Packs): Define named “packs” that specify which sections run, in what order, with defaults/overrides to compose report variants.
+
+US-03 (Prompt bundles/versioning): Manage versioned prompt bundles per section (with metadata + active version) so prompt changes are controlled and reproducible.
+
+US-04 (Single entrypoint runtime): Provide one runtime entrypoint that runs every section through the same pipeline (load prompt → LLM → guardrails → schema → telemetry).
+
+US-05 (CLI run pack): Run a named pack from the CLI and produce an assembled report with clear per-section success/failure summary and exit status.
+
+US-06 (Model selection by config): Select the LLM model deterministically from configuration per environment (and optional overrides) without code changes.
+
+US-07 (Central retry policy): Apply a centralized retry policy for transient LLM failures so retry behavior is consistent and observable across sections.
+
+US-08 (Single high policy profile): Enforce one high-strictness policy profile for all sections so outputs are consistently safe, accurate, and auditable.
+
+US-09 (Guardrails enforcement): Run guardrails on every section output and block/redact/fail deterministically when policies are violated.
+
+US-10 (Section schemas): Validate each section’s output against its schema so downstream report assembly is reliable and failures are explicit.
+
+US-11 (Structured telemetry/audit): Log every section run with version bindings, model info, and outcomes using a consistent correlation id for end-to-end auditability.
+
+US-12 (Offline eval runner): Run offline evaluations for a section + prompt version against datasets to produce metrics and a deterministic pass/fail before promotion.
+
+US-13 (Quant + qual eval scoring): Produce both quantitative metrics and qualitative rubric scores in a single eval artifact so prompt changes are measurable and explainable.
+
+US-14 (Company Overview section): Generate the “Company Overview” section from configured structure so the narrative is consistent, complete, and schema-valid.
+
+
+
+
+
+
+
+
+
+
+
+----------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------
 Feature: Generate "Financial Performance" section
   As a Credit Analyst
   I want a "Financial Performance" section generated from the company dossier
