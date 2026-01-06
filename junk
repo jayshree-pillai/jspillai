@@ -1,41 +1,202 @@
-Feature: Offline evaluation of a section prompt version against a dataset
+Feature: Generate "Financial Performance" section
+  As a Credit Analyst
+  I want a "Financial Performance" section generated from the company dossier
+  So that the report contains accurate trends, key ratios, and evidence-backed commentary
+
   Background:
-    Given offline evaluation is available for section outputs
-    And datasets are stored and discoverable by dataset_id (or file id/path)
+    Given a company dossier exists for "<company_id>"
+    And it includes normalized financial statements for the last "<n_years>" fiscal years and LTM
+    And each normalized value is traceable to a source document excerpt
 
-  Scenario: Run eval with explicit section, prompt version, and dataset
-    Given section_id "company_overview" exists
-    And prompt_version "v2026_01_05" exists for section_id "company_overview"
-    And dataset_id "ds_credit_core_v1" exists
-    When I run an offline eval with section_id "company_overview", prompt_version "v2026_01_05", dataset_id "ds_credit_core_v1"
-    Then the eval uses the same prompt-loading mechanism as runtime
-    And the eval produces a machine-readable results artifact containing:
-      | section_id     |
-      | prompt_version |
-      | dataset_id     |
-      | metrics        |
-      | pass_fail      |
-      | timestamp      |
+  Scenario: Generate Financial Performance with required metrics + narrative
+    When I run the "Financial Performance" section for "<company_id>"
+    Then the output includes a metrics table with at least: Revenue, EBITDA, EBITDA margin, EBIT, Net income, FCF, Capex, and Leverage-related ratios (as applicable)
+    And the output includes YoY (and/or LTM) trend commentary explaining primary drivers
+    And every quantitative claim is supported by a citation to the source excerpts
+    And the output conforms to the "Financial Performance" section schema
 
-  Scenario: Run eval with default dataset when dataset_id is omitted
-    Given section_id "company_overview" exists
-    And prompt_version "v2026_01_05" exists for section_id "company_overview"
-    And a default dataset is configured for section_id "company_overview"
-    When I run an offline eval with section_id "company_overview" and prompt_version "v2026_01_05" without dataset_id
-    Then the eval uses the configured default dataset
-    And the eval produces a machine-readable results artifact
+  Scenario: Missing required financial history
+    Given the dossier is missing normalized financials for at least "<min_years>" years
+    When I run the "Financial Performance" section for "<company_id>"
+    Then the section fails with a clear error stating the missing requirement (e.g., missing years/LTM)
+    And no partial section output is marked as successful
 
-  Scenario: Pass/fail is derived deterministically from configured thresholds
-    Given an eval threshold configuration exists for section_id "company_overview"
-    And the thresholds are not hardcoded in the evaluator
-    When an offline eval completes
-    Then pass_fail is computed deterministically from the produced metrics and the configured thresholds
-    And the results artifact includes the computed pass_fail
+  Scenario: Conflicting numbers across sources
+    Given the dossier contains conflicting values for the same metric and period from different sources
+    When I run the "Financial Performance" section for "<company_id>"
+    Then the output flags the conflict in a structured way (metric, period, competing sources)
+    And the section either uses a deterministic resolution rule or fails fast (per configured policy)
+    And the decision is logged/traceable
 
-  Scenario: Fail fast when dataset is missing or invalid
-    Given section_id "company_overview" exists
-    And prompt_version "v2026_01_05" exists for section_id "company_overview"
-    When I run an offline eval with dataset_id "ds_missing"
-    Then the eval fails with a clear error
-    And the error includes the attempted dataset reference and available dataset ids (or how to list them)
-    And no results artifact is produced
+  Scenario: Schema validation failure
+    Given the section generation completes
+    When the output is validated against the "Financial Performance" schema
+    Then if validation fails, the section is marked failed
+    And the failure includes the section id and failing field path(s)
+-------------------------------------------
+Feature: Generate "Capital Structure and Liquidity" section
+  As a Credit Analyst
+  I want a "Capital Structure and Liquidity" section generated from the dossier
+  So that funding, maturities, liquidity sources, and covenant considerations are clear and auditable
+
+  Background:
+    Given a company dossier exists for "<company_id>"
+    And it includes debt schedule details, liquidity disclosures, and latest balance sheet data
+    And relevant excerpts (maturity table, revolver terms, cash, covenant text) are available as citations
+
+  Scenario: Generate Capital Structure and Liquidity with maturity profile
+    When I run the "Capital Structure and Liquidity" section for "<company_id>"
+    Then the output summarizes capital structure (secured/unsecured, term debt, revolver, leases if applicable)
+    And the output includes a maturity profile (by year/bucket) with citations
+    And the output states liquidity position (cash, revolver availability, key sources/uses) with citations
+    And the output conforms to the section schema
+
+  Scenario: Revolver availability cannot be determined
+    Given revolver size and drawn amount (or availability) are missing from the dossier
+    When I run the "Capital Structure and Liquidity" section for "<company_id>"
+    Then the section fails with a clear error describing which fields are missing
+    And the error includes which source(s) were expected (or which extraction failed)
+
+  Scenario: Covenant disclosure exists but is incomplete
+    Given covenant text is present but thresholds are not extractable
+    When I run the "Capital Structure and Liquidity" section for "<company_id>"
+    Then the output explicitly states covenant details are not fully available
+    And the output avoids inventing thresholds
+    And the output cites the disclosure that indicates limitation
+
+  Scenario: Schema validation failure
+    When the output is validated against the "Capital Structure and Liquidity" schema
+    Then validation failures are returned with failing field path(s)
+----------------------------------------
+Feature: Generate "Industry Trends and Peer Analysis" section
+  As a Credit Analyst
+  I want an "Industry Trends and Peer Analysis" section generated from dossier + peer inputs
+  So that the report benchmarks the company and explains sector dynamics consistently
+
+  Background:
+    Given a company dossier exists for "<company_id>"
+    And an industry classification exists for "<company_id>"
+    And a peer set exists with identifiers "<peer_ids>"
+    And peer metrics (or a statement that they are unavailable) are available with citations
+
+  Scenario: Generate Industry Trends and Peer Analysis with peer benchmarking
+    When I run the "Industry Trends and Peer Analysis" section for "<company_id>"
+    Then the output summarizes key industry trends/drivers and near-term headwinds/tailwinds
+    And the output includes a peer comparison (table or structured list) for selected metrics (e.g., growth, margin, leverage, scale)
+    And benchmarking statements include citations or clearly state when peer data is unavailable
+    And the output conforms to the section schema
+
+  Scenario: Peer set is missing or invalid
+    Given "<peer_ids>" is empty or contains unknown identifiers
+    When I run the "Industry Trends and Peer Analysis" section for "<company_id>"
+    Then the section fails fast with an error stating the peer set issue
+    And no LLM-based generation proceeds (per policy)
+
+  Scenario: Industry trend claims require evidence
+    Given industry commentary sources are missing from the dossier
+    When I run the "Industry Trends and Peer Analysis" section for "<company_id>"
+    Then the section fails or returns an explicit "insufficient evidence" outcome (per configured policy)
+    And it does not output unsupported industry assertions
+
+  Scenario: Schema validation failure
+    When the output is validated against the "Industry Trends and Peer Analysis" schema
+    Then validation failures are returned with failing field path(s)
+----------------------------------
+Feature: Generate "Projections" section
+  As a Credit Analyst
+  I want a "Projections" section generated using stated assumptions + historical anchors
+  So that forward-looking views are structured, bounded, and explainable
+
+  Background:
+    Given a company dossier exists for "<company_id>"
+    And it includes historical financial anchors for at least "<n_years>" years and LTM
+    And a projections assumptions input exists (drivers, scenario tags, horizon)
+
+  Scenario: Generate Projections with assumptions and sensitivities
+    When I run the "Projections" section for "<company_id>" with horizon "<horizon_years>"
+    Then the output includes forecasted key lines (at least: Revenue, EBITDA, FCF or closest applicable)
+    And the output explicitly lists the assumptions used (drivers and rationale)
+    And the output includes at least one sensitivity or alternative scenario (if required by policy)
+    And the output clearly labels projections as forward-looking and distinguishes them from historical facts
+    And the output conforms to the section schema
+
+  Scenario: Missing projections assumptions
+    Given projections assumptions are missing or invalid
+    When I run the "Projections" section for "<company_id>"
+    Then the section fails with an error stating which assumptions are required
+    And no projections are produced
+
+  Scenario: Projection outputs contradict required constraints
+    Given a configured constraint exists (e.g., non-negative revenue, horizon length, required fields)
+    When I run the "Projections" section for "<company_id>"
+    Then violations are returned as a structured failure reason
+    And the section is not marked successful
+
+  Scenario: Schema validation failure
+    When the output is validated against the "Projections" schema
+    Then validation failures are returned with failing field path(s)
+--------------------------------
+Feature: Generate "Rating Summary" section
+  As a Credit Analyst
+  I want a "Rating Summary" section generated from rating sources and internal rationale
+  So that current ratings/outlooks, key drivers, and triggers are clearly stated and sourced
+
+  Background:
+    Given a company dossier exists for "<company_id>"
+    And it contains rating agency information (ratings, outlook, date, rationale excerpts) when available
+    And internal report context includes the chosen rating framework (if applicable)
+
+  Scenario: Generate Rating Summary with ratings, outlook, and rationale
+    When I run the "Rating Summary" section for "<company_id>"
+    Then the output includes current rating(s), outlook, and effective date (if available) with citations
+    And the output summarizes the main rating drivers and stated triggers (upgrade/downgrade) with citations
+    And the output explicitly notes when no public rating exists (if applicable)
+    And the output conforms to the section schema
+
+  Scenario: Rating exists but is stale or missing date
+    Given rating text exists but the effective date is missing or older than "<staleness_threshold>"
+    When I run the "Rating Summary" section for "<company_id>"
+    Then the output flags the staleness/unknown date condition
+    And the output avoids asserting recency without evidence
+
+  Scenario: No rating sources available
+    Given no rating agency sources exist in the dossier
+    When I run the "Rating Summary" section for "<company_id>"
+    Then the section outputs a structured "NO_RATING_DATA" outcome (or fails, per policy)
+    And it does not invent ratings or outlooks
+
+  Scenario: Schema validation failure
+    When the output is validated against the "Rating Summary" schema
+    Then validation failures are returned with failing field path(s)
+--------------------------------
+Feature: Generate "Key Risks and Mitigants" section
+  As a Credit Analyst
+  I want "Key Risks and Mitigants" generated from disclosed risks + observed indicators
+  So that the report highlights the most material downside factors with evidence and monitoring cues
+
+  Background:
+    Given a company dossier exists for "<company_id>"
+    And it contains risk disclosures (10-K/10-Q risk factors, MD&A, covenant and liquidity excerpts) when available
+
+  Scenario: Generate Key Risks and Mitigants as structured pairs
+    When I run the "Key Risks and Mitigants" section for "<company_id>"
+    Then the output provides a list of risks where each risk includes: description, evidence citation(s), and severity (if required by schema/policy)
+    And each risk includes a corresponding mitigant (or states "no clear mitigant disclosed") with citations
+    And the output includes monitoring indicators (where applicable) without fabricating data
+    And the output conforms to the section schema
+
+  Scenario: Risk disclosures missing
+    Given risk disclosure excerpts are missing from the dossier
+    When I run the "Key Risks and Mitigants" section for "<company_id>"
+    Then the section fails or returns an explicit "insufficient evidence" outcome (per policy)
+    And it does not output generic risks as if they were company-specific facts
+
+  Scenario: Unsupported mitigant is proposed
+    Given a mitigant cannot be backed by a source excerpt
+    When I run the "Key Risks and Mitigants" section for "<company_id>"
+    Then the output labels the mitigant as an analyst inference (if allowed) or removes it (per policy)
+    And the decision is traceable in the run output/logs
+
+  Scenario: Schema validation failure
+    When the output is validated against the "Key Risks and Mitigants" schema
+    Then validation failures are returned with failing field path(s)
