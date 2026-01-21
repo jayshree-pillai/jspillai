@@ -1,87 +1,38 @@
-src/                                              # application source root
-  prompts/                                        # self-contained prompt subsystem (only prompt stuff lives here)
-    config/                                       # prompt configs (YAML) = what to run + rules (NOT app infra config)
-      models.yaml                                 # how to run the LLM: which model (and params) to use per step (extract/compose/verify)
-      policies.yaml                               # what the LLM is allowed/required to do: global guardrails + default gates (citations, no-guessing, tone)
-      industry_map.yaml                           # industry → default section versions + component add/override rules
-      kpis.yaml                                   # Named KPI packs (reusable metric bundles) that components reference to hydrate prompts consistently
-      retrieval.yaml                              # named retrieval_profiles = reusable “context recipes” (which chunks to pull)
+src/
+  prompts/                              # prompt subsystem (self-contained)
+    config/                             # YAML control plane
+      sections/                         # section recipes (what runs, order, versions)
+        company_overview/
+          default.yaml                  # default version pointer
+          v1.yaml                       # recipe: components + overrides
+      components/                       # reusable component configs (intent + steps)
+        operating_performance_snapshot.yaml
+        business_model.yaml
+      retrieval.yaml                    # all retrieval profiles (financials_mda, risk_factors, ...)
+      kpis.yaml                         # KPI packs (performance_core, liquidity_core, ...)
+      policies.yaml                     # global rules/gates (citations, not disclosed, etc.)
+      models.yaml                       # LLM runtime config (single model ok, per-step params)
 
-      sections/                                   # section “recipes” (which components, in what order), versioned
-        company_overview/                         # Company Overview section home
-          default.yaml                            # section home page: default version + always-on overrides
-          v1.yaml                                 # Company Overview recipe v1 (components list + ordering + overrides)
-          v2.yaml                                 # Company Overview recipe v2 (alternate recipe/version)
+    assets/                             # prompt text (.md)
+      extract.md                        # step template
+      compose.md                        # step template
+      verify.md                         # step template
+      blocks/                           # reusable prompt blocks
+        system.md
+        citations.md
+        not_disclosed.md
+        style.md
 
-        key_risks_mitigants/                      # Key Risks & Mitigants section home
-          default.yaml                            # section home page: default version + always-on overrides
-          v1.yaml                                 # risks recipe v1 (risk components + ordering + strictness)
+    engine/                             # lifecycle runtime (KISS files)
+      compile.py                        # pick section version + expand to component plan
+      fetch.py                          # fetch chunks via retrieval profile + KPIs
+      build.py                          # hydrate templates with rules + context
+      validate.py                       # gates: schema/citations/numerics
+      execute.py                        # run steps sequentially per component
 
-        financial_performance_cashflow/           # Recent Financial Performance & Cash Flow section home
-          default.yaml                            # section home page: default version + always-on overrides
-          v1.yaml                                 # financial performance recipe v1
-
-        capital_structure_maturity/               # Capital Structure & Debt Maturity section home
-          default.yaml                            # section home page: default version + always-on overrides
-          v1.yaml                                 # capital structure recipe v1
-
-        transaction_background_exposure/          # Transaction Background & Exposure section home
-          default.yaml                            # section home page: default version + always-on overrides
-          v1.yaml                                 # transaction/exposure recipe v1
-
-        rating_overview/                          # Rating Overview section home
-          default.yaml                            # section home page: default version + always-on overrides
-          v1.yaml                                 # ratings recipe v1
-
-        projections_forward_looking/              # Projections / Forward-Looking section home
-          default.yaml                            # section home page: default version + always-on overrides
-          v1.yaml                                 # projections recipe v1
-
-        industry_trends_peer_context/             # Industry Trends & Peer/Market Context section home
-          default.yaml                            # section home page: default version + always-on overrides
-          v1.yaml                                 # industry/peer context recipe v1
-
-      components/                                 # reusable component configs (how to run each component);includes `steps:` to define 1-call vs multi-call per component
-        company_identity.yaml                     # component: identity/footprint (template + retrieval_profile + gates)
-        business_model.yaml                       # component: business model (what they do, revenue drivers)
-        segments_mix.yaml                         # component: segment/geo mix (tables/notes heavy)
-        scale_market_position.yaml                # component: scale + positioning (no “leader” claims w/o cite)
-        management_strategy.yaml                  # component: stated strategy only (high hallucination risk)
-        operating_performance_snapshot.yaml       # component: performance snapshot (often uses financials_mda)
-        balance_sheet_liquidity_snapshot.yaml     # component: liquidity snapshot (often uses liquidity_debt)
-        material_developments_credit_implications.yaml  # component: events + credit implications (strict gating)
-		....
-        risk_factors_summary.yaml                 # component: pull/summary from Risk Factors (risk_factors profile)
-        financial_risk_signals.yaml               # component: risks evidenced in MD&A/financials (financials_mda)
-        liquidity_risk.yaml                       # component: covenant/refi/liquidity risks (liquidity_debt)
-        legal_regulatory_risk.yaml                # component: legal/regulatory risks (legal_regulatory)
-        mitigants_monitoring.yaml                 # component: mitigants + watchlist (must be source-backed)
-
-    assets/                                       # prompt text building blocks (templates/blocks), no YAML logic
-      templates/                                  # template for verify/repair call
-        extract.md                                # template for extract call
-        compose.md                                # template for compose call
-        verify.md                                 # template for verify/repair call
-      blocks/                                     # reusable text blocks injected into prompts
-        system.md                                 # base system rules for CAR (role, tone, constraints)
-        style.md                                  # writing style rules (analyst voice, concise, structured)
-        citations.md                              # citation/provenance rules + formatting requirements
-        not_disclosed.md                          # standard “Not disclosed in provided sources.” language
-      section_wrappers/                           # optional wrappers to stitch component outputs into a section
-        company_overview.md                       # section wrapper: how to assemble CO components into final prose
-        key_risks_mitigants.md                    # section wrapper: how to assemble risks components into final prose
-
-    engine/                                       # runtime that enforces lifecycle (compile→fetch→build→validate→execute)
-      compile.py                                  # select version + load section recipe + expand components → PromptPlan
-      fetch.py                                    # apply retrieval_profile + KPI pack → ContextBundle
-      build.py                                    # hydrate templates/blocks with context/policies → PromptBundle(s)
-      validate.py                                 # run gates (schema/citations/numerics) → GateResult
-      execute.py                                  # run steps (extract/compose/verify-if-needed) per component;runs 1..N LLM calls per component based on `steps`
-      __init__.py                                 # clean entrypoints for callers (build plan / run section / etc.)
-
-    models/                                      # The models folder defines the Pydantic contracts for the prompt engine — strongly-typed schemas for the plan, prompt bundles, LLM outputs, gates, and provenance — so every stage of the lifecycle produces and consumes validated, predictable artifacts
-      plan_schema.py    	                     # Pydantic contract for the compiled run plan: section/version + ordered components + overrides.
-      bundle_schema.py                           # Pydantic contract for the final PromptBundle sent to the LLM: messages + context refs + metadata.
-      result_schema.py                           # Pydantic contract for outputs returned by the LLM: structured facts + narrative + citations (per step/component/section)
-      gate_schema.py                             # Pydantic contract for quality gate outcomes: pass/warn/fail + reasons + retry/repair action.
-      provenance_schema.py                       # Pydantic contract for evidence traceability: doc/chunk/location + claim-to-source citation mapping.
+    schemas/                            # Pydantic contracts (rename from models to avoid confusion)
+      plan.py                           # PromptPlan
+      bundle.py                         # PromptBundle
+      result.py                         # Results (step/component/section)
+      gate.py                           # GateResult
+      provenance.py                     # Evidence/citation mapping
