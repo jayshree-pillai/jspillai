@@ -1,58 +1,107 @@
-car_generation/
-  app/
-    functions/
-      ingest_function.py          # thin Azure Function wrapper (trigger → call IngestService)
-      report_function.py          # thin Cosmos-trigger wrapper (trigger → call ReportService)
+#!/usr/bin/env python3
+"""
+Scaffold the prompts subsystem folder structure + placeholder files.
 
-  domain/
-    enums.py                      # DocumentTypes, Status, YearEnum (and optionally SectionId)
-    value_objects.py              # FiscalPeriod, DocumentDate (parsing/normalization rules)
-    dto.py                        # boundary payloads: ReportRequest, UploadResponse, IngestDocumentResponse
-    models/
-      counterparty.py             # Counterparty, CounterpartyFile (company + file metadata)
-      adjustments.py              # Adjustment, MetricAdjustments, AdjustmentDoc, JSONDoc (JSON financials)
-      report_models.py            # Report, PromptResponse, SectionSummary, Citation (report contracts)
-      pipeline_status.py          # PipelineStep, PipelineRun (run tracking models)
+Usage:
+  python scaffold_prompts.py
+  python scaffold_prompts.py --base .              # default
+  python scaffold_prompts.py --force               # overwrite existing files
+"""
 
-  parsing/
-    filename.py                   # extract_ccif + blob/path parsing helpers
-    doc_type_detector.py          # DOC_TYPE_PATTERNS + detect() (infer doc type from filename)
-    pdf_extract.py                # LLM-based extraction from first-page text (structured models)
-    json_preprocess.py            # preprocess_json → AdjustmentDoc (reshape CAR JSON to domain)
+from __future__ import annotations
 
-  services/
-    ingest_service.py             # orchestration: blob → metadata → LLM extract → cosmos upsert
-    report_service.py             # orchestration: validate → retrieve → generate sections → upload report
-    document_validation.py        # doc-date selection rules (10-K/10-Q/ratings recency constraints)
-    embedding_service.py          # should_embed/check_embeddings policy wrapper
-    metadata_service.py           # load_counterparty_df + lookup_metadata (ccif → industry/subindustry)
-    sections/
-      base.py                     # SectionGenerator interface + SectionResult contract
-      registry.py                 # SectionId → SectionGenerator mapping
-      company_overview.py         # Company Overview section generator (uses PromptLC + retrieval)
+from pathlib import Path
+import argparse
 
-  adapters/
-    storage/
-      blob_store.py               # Azure Blob IO (download/list/read counterparty/docs)
-    persistence/
-      cosmos_repo.py              # generic cosmos upserts (upload_to_cosmos, mapping table updates)
-      cosmos_reports_repo.py      # report-specific cosmos ops (fetch docs, upload_car_report)
-      pipeline_run_repo.py        # run/status persistence (update_run_status, check_in_progress)
-    search/
-      azure_search_repo.py        # Azure AI Search/vector retrieval (build_filter + query)
-    http/
-      graph_extractor_client.py   # external graph extraction call (httpx client wrapper)
 
-  core/
-    config.py                     # config loading (ini/env) → typed config object
-    clients.py                    # init_clients: cosmos/blob/openai/search clients
-    telemetry.py                  # tracer helpers + span utilities
-    logging.py                    # logging setup (formatters/levels)
+def comment_for(path: Path, text: str) -> str:
+    ext = path.suffix.lower()
+    if ext == ".py":
+        return f"# {text}\n"
+    if ext in {".yaml", ".yml"}:
+        return f"# {text}\n"
+    if ext == ".md":
+        return f"<!-- {text} -->\n"
+    return f"{text}\n"
 
-prompt_lifecycle/
-  config/                         # industry_map + KPI packs/registry + routing/policies config
-  prompts/                        # versioned prompt templates per section (e.g., company_overview/*)
-  engine/                         # prompt loading/routing + LLM client + guardrails/retry runtime
-  eval/                           # eval harness (optional)
-  cli/                            # CLI entrypoints for running/resolving prompts
-  telemetry/                      # prompt-level metrics + trace correlation hooks
+
+def write_file(path: Path, text: str, force: bool) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    if path.exists() and not force:
+        # If the file exists but is empty, add the comment line.
+        if path.is_file() and path.stat().st_size == 0:
+            path.write_text(text, encoding="utf-8")
+        return
+
+    path.write_text(text, encoding="utf-8")
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--base", type=str, default=".", help="Base folder to create src/ under.")
+    parser.add_argument("--force", action="store_true", help="Overwrite existing files.")
+    args = parser.parse_args()
+
+    base = Path(args.base).resolve()
+
+    files: dict[str, str] = {
+        # config: YAML control plane
+        "src/prompts/config/sections/company_overview/default.yaml": "default version pointer",
+        "src/prompts/config/sections/company_overview/v1.yaml": "recipe: components + overrides",
+        "src/prompts/config/components/operating_performance_snapshot.yaml": "reusable component config (intent + steps)",
+        "src/prompts/config/components/business_model.yaml": "reusable component config (intent + steps)",
+        "src/prompts/config/retrieval.yaml": "retrieval profiles (financials_mda, risk_factors, ...)",
+        "src/prompts/config/kpis.yaml": "KPI packs (performance_core, liquidity_core, ...)",
+        "src/prompts/config/policies.yaml": "global rules/gates (citations, not disclosed, etc.)",
+        "src/prompts/config/models.yaml": "LLM runtime config (single model ok, per-step params)",
+
+        # assets: prompt text
+        "src/prompts/assets/extract.md": "step template: extract",
+        "src/prompts/assets/compose.md": "step template: compose",
+        "src/prompts/assets/verify.md": "step template: verify",
+        "src/prompts/assets/blocks/system.md": "reusable prompt block: system",
+        "src/prompts/assets/blocks/citations.md": "reusable prompt block: citations",
+        "src/prompts/assets/blocks/not_disclosed.md": "reusable prompt block: not_disclosed",
+        "src/prompts/assets/blocks/style.md": "reusable prompt block: style",
+
+        # engine: lifecycle runtime
+        "src/prompts/engine/compile.py": "pick section version + expand to component plan",
+        "src/prompts/engine/fetch.py": "fetch chunks via retrieval profile + KPIs",
+        "src/prompts/engine/build.py": "hydrate templates with rules + context",
+        "src/prompts/engine/validate.py": "gates: schema/citations/numerics",
+        "src/prompts/engine/execute.py": "run steps sequentially per component",
+
+        # schemas: Pydantic contracts
+        "src/prompts/schemas/plan.py": "PromptPlan",
+        "src/prompts/schemas/bundle.py": "PromptBundle",
+        "src/prompts/schemas/result.py": "Results (step/component/section)",
+        "src/prompts/schemas/gate.py": "GateResult",
+        "src/prompts/schemas/provenance.py": "Evidence/citation mapping",
+    }
+
+    # Create top-level dirs too (even if empty)
+    dirs = [
+        "src/prompts",
+        "src/prompts/config",
+        "src/prompts/config/sections",
+        "src/prompts/config/sections/company_overview",
+        "src/prompts/config/components",
+        "src/prompts/assets",
+        "src/prompts/assets/blocks",
+        "src/prompts/engine",
+        "src/prompts/schemas",
+    ]
+    for d in dirs:
+        (base / d).mkdir(parents=True, exist_ok=True)
+
+    # Create files with 1-line comments
+    for rel_path, desc in files.items():
+        p = base / rel_path
+        write_file(p, comment_for(p, desc), force=args.force)
+
+    print(f"✅ Scaffold created under: {base}")
+
+
+if __name__ == "__main__":
+    main()
