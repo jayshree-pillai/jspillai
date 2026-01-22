@@ -1,84 +1,32 @@
-# PromptBundle : The exact payload to send to the LLM
-from typing import List, Optional
-from pydantic import BaseModel
+# component intent + steps + which evidence/KPIs it needs.
+instructions: >
+  Summarize what the company does, what it sells, who it sells to (if stated),
+  and how it makes money. Keep it grounded.
 
-class Message(BaseModel):
-    role: str          # "system" | "user" | "assistant"
-    content: str
+retrieval_profile: "overview_text"
+kpi_pack: null
 
-class PromptBundle(BaseModel):
-    section: str
-    version: str
-    component_id: str
-    step: str          # "extract" | "compose" | "verify"
+steps:
+  - extract
+  - compose
 
-    messages: List[Message]
-    retrieval_profile: Optional[str] = None
-    kpi_pack: Optional[str] = None
-----------
-# GateResult : quality check for the LLM response
-from typing import List, Optional
-from pydantic import BaseModel
+gates:
+  - schema_valid
+  - citations_required
+-----------------------
+# reusable component config (intent + steps)
+instructions: >
+  Summarize recent operating performance: revenue and profitability trend for the period,
+  and the stated drivers if disclosed. Keep it short.
 
+retrieval_profile: "financials_mda"
+kpi_pack: "performance_core"
 
-class GateResult(BaseModel):
-    status: str # "PASS" | "WARN" | "FAIL"
-    reasons: List[str] = []
-    action: Optional[str] = None   # e.g., "RUN_VERIFY" | "RETRY" | None
------------
-# PromptPlan : compiled plan contract that compile.py will output and execute.py will consume.
-from typing import Any, Dict, List, Optional
-from pydantic import BaseModel
+steps:
+  - kpi_extract
+  - extract
+  - compose
 
-
-class ComponentOverride(BaseModel):
-    retrieval_profile: Optional[str] = None
-    kpi_pack: Optional[str] = None
-    risk_level: Optional[str] = None
-    steps: Optional[List[str]] = None
-    gates: Optional[List[str]] = None
-
-
-class ComponentPlan(BaseModel):
-    component_id: str
-    override: Optional[ComponentOverride] = None
-
-
-class PromptPlan(BaseModel):
-    section: str
-    version: str
-    components: List[ComponentPlan]
-    meta: Dict[str, Any] = {}
----------------
-# Evidence/citation mapping citation map linking each claim/field to the evidence chunk IDs that support it
-from typing import Dict, List
-from pydantic import BaseModel
-
-
-class Provenance(BaseModel):
-    # claim/field - list of chunk ids
-    citations: Dict[str, List[str]] = {}
----------------
-# Results:LLM produced per step/content and final stitched section narrative + gates + citiations
-from typing import Any, Dict, Optional
-from pydantic import BaseModel
-from .gate import GateResult
-from .provenance import Provenance
-
-class StepResult(BaseModel):
-    text: str
-    data: Optional[Dict[str, Any]] = None          # e.g., extracted facts_json
-    provenance: Provenance = Provenance()
-    gate: GateResult = GateResult(status="PASS")
-
-class ComponentResult(BaseModel):
-    component_id: str
-    extract: Optional[StepResult] = None
-    compose: Optional[StepResult] = None
-    verify: Optional[StepResult] = None
-
-class SectionResult(BaseModel):
-    section: str
-    version: str
-    narrative: str                                 # stitched section text
-    components: Dict[str, ComponentResult] = {}
+gates:
+  - schema_valid
+  - citations_required
