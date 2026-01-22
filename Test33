@@ -1,107 +1,73 @@
-#!/usr/bin/env python3
-"""
-Scaffold the prompts subsystem folder structure + placeholder files.
+# KPI packs (performance_core, liquidity_core, ...)
+packs:
+  performance_core:
+    - revenue
+    - yoy_growth
+    - operating_margin
 
-Usage:
-  python scaffold_prompts.py
-  python scaffold_prompts.py --base .              # default
-  python scaffold_prompts.py --force               # overwrite existing files
-"""
+  liquidity_core:
+    - cash
+    - total_debt
+    - net_debt
 
-from __future__ import annotations
+#models.yaml
+# Runtime hints for the outer service when calling the LLM.
 
-from pathlib import Path
-import argparse
+model: "gpt-4.2"
 
+steps:
+  #only pulls numbers/metrics for a known list of KPI keys: ex
+  #{"kpis": {"revenue": "...", "operating_margin": "..."}}
+  kpi_extract:
+    temperature: 0.0
+    max_tokens: 400
+  #extract = pulls the rest of the structured facts the component needs (business model, segments, drivers, etc.) and ties them to citations
+  #{"facts": {...}, "citations": {...}}
+  extract:
+    temperature: 0.0
+    max_tokens: 800
 
-def comment_for(path: Path, text: str) -> str:
-    ext = path.suffix.lower()
-    if ext == ".py":
-        return f"# {text}\n"
-    if ext in {".yaml", ".yml"}:
-        return f"# {text}\n"
-    if ext == ".md":
-        return f"<!-- {text} -->\n"
-    return f"{text}\n"
+  compose:
+    temperature: 0.2
+    max_tokens: 800
 
-
-def write_file(path: Path, text: str, force: bool) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-
-    if path.exists() and not force:
-        # If the file exists but is empty, add the comment line.
-        if path.is_file() and path.stat().st_size == 0:
-            path.write_text(text, encoding="utf-8")
-        return
-
-    path.write_text(text, encoding="utf-8")
-
-
-def main() -> None:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--base", type=str, default=".", help="Base folder to create src/ under.")
-    parser.add_argument("--force", action="store_true", help="Overwrite existing files.")
-    args = parser.parse_args()
-
-    base = Path(args.base).resolve()
-
-    files: dict[str, str] = {
-        # config: YAML control plane
-        "src/prompts/config/sections/company_overview/default.yaml": "default version pointer",
-        "src/prompts/config/sections/company_overview/v1.yaml": "recipe: components + overrides",
-        "src/prompts/config/components/operating_performance_snapshot.yaml": "reusable component config (intent + steps)",
-        "src/prompts/config/components/business_model.yaml": "reusable component config (intent + steps)",
-        "src/prompts/config/retrieval.yaml": "retrieval profiles (financials_mda, risk_factors, ...)",
-        "src/prompts/config/kpis.yaml": "KPI packs (performance_core, liquidity_core, ...)",
-        "src/prompts/config/policies.yaml": "global rules/gates (citations, not disclosed, etc.)",
-        "src/prompts/config/models.yaml": "LLM runtime config (single model ok, per-step params)",
-
-        # assets: prompt text
-        "src/prompts/assets/extract.md": "step template: extract",
-        "src/prompts/assets/compose.md": "step template: compose",
-        "src/prompts/assets/verify.md": "step template: verify",
-        "src/prompts/assets/blocks/system.md": "reusable prompt block: system",
-        "src/prompts/assets/blocks/citations.md": "reusable prompt block: citations",
-        "src/prompts/assets/blocks/not_disclosed.md": "reusable prompt block: not_disclosed",
-        "src/prompts/assets/blocks/style.md": "reusable prompt block: style",
-
-        # engine: lifecycle runtime
-        "src/prompts/engine/compile.py": "pick section version + expand to component plan",
-        "src/prompts/engine/fetch.py": "fetch chunks via retrieval profile + KPIs",
-        "src/prompts/engine/build.py": "hydrate templates with rules + context",
-        "src/prompts/engine/validate.py": "gates: schema/citations/numerics",
-        "src/prompts/engine/execute.py": "run steps sequentially per component",
-
-        # schemas: Pydantic contracts
-        "src/prompts/schemas/plan.py": "PromptPlan",
-        "src/prompts/schemas/bundle.py": "PromptBundle",
-        "src/prompts/schemas/result.py": "Results (step/component/section)",
-        "src/prompts/schemas/gate.py": "GateResult",
-        "src/prompts/schemas/provenance.py": "Evidence/citation mapping",
-    }
-
-    # Create top-level dirs too (even if empty)
-    dirs = [
-        "src/prompts",
-        "src/prompts/config",
-        "src/prompts/config/sections",
-        "src/prompts/config/sections/company_overview",
-        "src/prompts/config/components",
-        "src/prompts/assets",
-        "src/prompts/assets/blocks",
-        "src/prompts/engine",
-        "src/prompts/schemas",
-    ]
-    for d in dirs:
-        (base / d).mkdir(parents=True, exist_ok=True)
-
-    # Create files with 1-line comments
-    for rel_path, desc in files.items():
-        p = base / rel_path
-        write_file(p, comment_for(p, desc), force=args.force)
-
-    print(f"✅ Scaffold created under: {base}")
+  verify:
+    temperature: 0.0
+    max_tokens: 600
 
 
-if __name__ == "__main__":
-    main()
+
+
+#policies.yaml
+# global rules/gates (citations, not disclosed, etc.)
+not_disclosed_phrase: "Not disclosed in provided sources."
+
+rules:
+  - "Use only provided sources."
+  - "No guessing."
+  - "Cite non-obvious claims as [CHUNK_ID]."
+
+gates:
+  schema_valid: true
+  citations_required: true
+
+
+
+# retreival.yaml
+# retrieval profiles (financials_mda, risk_factors, ...)
+profiles:
+  overview_text:
+    desc: "Business section / company description"
+    top_k: 12
+  financials_mda:
+    desc: "MD&A Results of Ops + core financial tables"
+    top_k: 12
+  segments_notes:
+    desc: "Segment reporting note + segment MD&A discussion"
+    top_k: 10
+  liquidity_debt:
+    desc: "Liquidity section + debt/credit facility notes"
+    top_k: 12
+  risk_factors:
+    desc: "10-K/10-Q Risk Factors"
+    top_k: 12
