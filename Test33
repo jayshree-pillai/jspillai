@@ -1,73 +1,84 @@
-# KPI packs (performance_core, liquidity_core, ...)
-packs:
-  performance_core:
-    - revenue
-    - yoy_growth
-    - operating_margin
+# PromptBundle : The exact payload to send to the LLM
+from typing import List, Optional
+from pydantic import BaseModel
 
-  liquidity_core:
-    - cash
-    - total_debt
-    - net_debt
+class Message(BaseModel):
+    role: str          # "system" | "user" | "assistant"
+    content: str
 
-#models.yaml
-# Runtime hints for the outer service when calling the LLM.
+class PromptBundle(BaseModel):
+    section: str
+    version: str
+    component_id: str
+    step: str          # "extract" | "compose" | "verify"
 
-model: "gpt-4.2"
-
-steps:
-  #only pulls numbers/metrics for a known list of KPI keys: ex
-  #{"kpis": {"revenue": "...", "operating_margin": "..."}}
-  kpi_extract:
-    temperature: 0.0
-    max_tokens: 400
-  #extract = pulls the rest of the structured facts the component needs (business model, segments, drivers, etc.) and ties them to citations
-  #{"facts": {...}, "citations": {...}}
-  extract:
-    temperature: 0.0
-    max_tokens: 800
-
-  compose:
-    temperature: 0.2
-    max_tokens: 800
-
-  verify:
-    temperature: 0.0
-    max_tokens: 600
+    messages: List[Message]
+    retrieval_profile: Optional[str] = None
+    kpi_pack: Optional[str] = None
+----------
+# GateResult : quality check for the LLM response
+from typing import List, Optional
+from pydantic import BaseModel
 
 
+class GateResult(BaseModel):
+    status: str # "PASS" | "WARN" | "FAIL"
+    reasons: List[str] = []
+    action: Optional[str] = None   # e.g., "RUN_VERIFY" | "RETRY" | None
+-----------
+# PromptPlan : compiled plan contract that compile.py will output and execute.py will consume.
+from typing import Any, Dict, List, Optional
+from pydantic import BaseModel
 
 
-#policies.yaml
-# global rules/gates (citations, not disclosed, etc.)
-not_disclosed_phrase: "Not disclosed in provided sources."
-
-rules:
-  - "Use only provided sources."
-  - "No guessing."
-  - "Cite non-obvious claims as [CHUNK_ID]."
-
-gates:
-  schema_valid: true
-  citations_required: true
+class ComponentOverride(BaseModel):
+    retrieval_profile: Optional[str] = None
+    kpi_pack: Optional[str] = None
+    risk_level: Optional[str] = None
+    steps: Optional[List[str]] = None
+    gates: Optional[List[str]] = None
 
 
+class ComponentPlan(BaseModel):
+    component_id: str
+    override: Optional[ComponentOverride] = None
 
-# retreival.yaml
-# retrieval profiles (financials_mda, risk_factors, ...)
-profiles:
-  overview_text:
-    desc: "Business section / company description"
-    top_k: 12
-  financials_mda:
-    desc: "MD&A Results of Ops + core financial tables"
-    top_k: 12
-  segments_notes:
-    desc: "Segment reporting note + segment MD&A discussion"
-    top_k: 10
-  liquidity_debt:
-    desc: "Liquidity section + debt/credit facility notes"
-    top_k: 12
-  risk_factors:
-    desc: "10-K/10-Q Risk Factors"
-    top_k: 12
+
+class PromptPlan(BaseModel):
+    section: str
+    version: str
+    components: List[ComponentPlan]
+    meta: Dict[str, Any] = {}
+---------------
+# Evidence/citation mapping citation map linking each claim/field to the evidence chunk IDs that support it
+from typing import Dict, List
+from pydantic import BaseModel
+
+
+class Provenance(BaseModel):
+    # claim/field - list of chunk ids
+    citations: Dict[str, List[str]] = {}
+---------------
+# Results:LLM produced per step/content and final stitched section narrative + gates + citiations
+from typing import Any, Dict, Optional
+from pydantic import BaseModel
+from .gate import GateResult
+from .provenance import Provenance
+
+class StepResult(BaseModel):
+    text: str
+    data: Optional[Dict[str, Any]] = None          # e.g., extracted facts_json
+    provenance: Provenance = Provenance()
+    gate: GateResult = GateResult(status="PASS")
+
+class ComponentResult(BaseModel):
+    component_id: str
+    extract: Optional[StepResult] = None
+    compose: Optional[StepResult] = None
+    verify: Optional[StepResult] = None
+
+class SectionResult(BaseModel):
+    section: str
+    version: str
+    narrative: str                                 # stitched section text
+    components: Dict[str, ComponentResult] = {}
