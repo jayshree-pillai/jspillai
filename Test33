@@ -1,8 +1,42 @@
-# default version pointer
-default_version: "v1"
+## Call 1 — business_model / extract
+You are generating a credit analysis report.
+Be precise and concise.
+Use only provided sources.
+No guessing.
+
+Citations:
+- Any non-obvious claim must cite source chunk ids like [CHUNK_ID].
+- If no source, say: "Not disclosed in provided sources."
+
+Missing info phrase:
+"Not disclosed in provided sources."
+
+Style:
+- Analyst tone.
+- Short sentences.
+- No fluff.
+- Use bullets when helpful.
+
+Rules:
+- Use only PROVIDED_SOURCES.
+- No guessing. Missing => "Not disclosed in provided sources."
+- Cite non-obvious facts as [CHUNK_ID].
+- JSON only.
+
+COMPONENT: business_model
+TASK: Summarize what the company does, what it sells, who it sells to (if stated),
+and how it makes money. Keep it grounded.
+
+KPI_VALUES:
 
 
+PROVIDED_SOURCES:
+[OV_01] We are a global provider of X, serving Y customers across Z markets...
+[OV_02] Our revenue is primarily generated through subscriptions and usage-based fees...
+[OV_03] We operate in North America and Europe...
 
-components:
-  - business_model
-  - operating_performance_snapshot
+Return:
+{
+  "facts": {},
+  "citations": {}
+}
