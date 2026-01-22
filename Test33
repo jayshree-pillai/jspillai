@@ -1,32 +1,8 @@
-# component intent + steps + which evidence/KPIs it needs.
-instructions: >
-  Summarize what the company does, what it sells, who it sells to (if stated),
-  and how it makes money. Keep it grounded.
+# default version pointer
+default_version: "v1"
 
-retrieval_profile: "overview_text"
-kpi_pack: null
 
-steps:
-  - extract
-  - compose
 
-gates:
-  - schema_valid
-  - citations_required
------------------------
-# reusable component config (intent + steps)
-instructions: >
-  Summarize recent operating performance: revenue and profitability trend for the period,
-  and the stated drivers if disclosed. Keep it short.
-
-retrieval_profile: "financials_mda"
-kpi_pack: "performance_core"
-
-steps:
-  - kpi_extract
-  - extract
-  - compose
-
-gates:
-  - schema_valid
-  - citations_required
+components:
+  - business_model
+  - operating_performance_snapshot
