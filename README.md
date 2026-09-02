@@ -3,12 +3,13 @@
 
 Welcome to my portfolio.
 
-I specialize in designing real-time machine learning pipelines with low-latency inference, robust retraining loops, and production-grade deployment on AWS.
-My focus: end-to-end ML systems — from modeling and evaluation to infrastructure and observability.
+I’m a GenAI / LLM Systems Architect with 15+ years of experience spanning software engineering, platform architecture, production ML, and enterprise AI delivery.
 
-Every project here reflects hands-on implementation across classification, regression, and NLP using tools like AWS SageMaker, Lambda, Kinesis, and Feature Store.
+I architect systems end to end and build critical components hands-on—from document intelligence, hybrid retrieval, reranking, and LLM orchestration to guardrails, evaluation, asynchronous processing, and observability.
 
-This GitHub isn’t for experiments. It’s a track record of deployed systems.Want to see this in action? [watch the live demo](#-live-demo)
+My work spans Python, FastAPI, and Pydantic across Azure OpenAI, Azure AI Search, Azure Document Intelligence, Cosmos DB, SQL, and Application Insights, backed by earlier production ML experience with AWS SageMaker, MLflow, Docker, Terraform, low-latency inference, monitoring, and retraining pipelines.
+
+This is just a trailer ---> [watch the live demo](#-live-demo)
 
 ---
 
