@@ -50,4 +50,4 @@ Hourly demand prediction using XGBoost and feature-engineered weather + time var
 
 ---
 
-Thanks for stopping by — I don’t showcase experiments here, only validated systems. Always open to technical conversations and real-world ML opportunities.
+Thanks for stopping by - Always open to technical conversations and real-world ML opportunities.
